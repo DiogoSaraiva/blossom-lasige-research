@@ -1,4 +1,4 @@
 [submodule "open_hmi"]
 	path = open_hmi
 	url = https://github.com/DiogoSaraiva/OpenHMI.git
-	branch = main
+	branch = testing
