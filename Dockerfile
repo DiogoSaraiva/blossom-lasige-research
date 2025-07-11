@@ -9,6 +9,6 @@ RUN git clone --recurse-submodules --single-branch --branch main https://github.
 
 WORKDIR /app/open_hmi/blossom_public/
 
-RUN pip install --no-cache-dir -r requirements.txt || true
+RUN pip install --no-cache-dir -r ../../requirements.txt || true
 
 ENTRYPOINT ["python", "start.py"]

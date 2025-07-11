@@ -52,7 +52,7 @@ mpmath==1.3.0
 # Others
 tornado==6.5.1
 bottle==0.13.4
-opencv-contrib-python==4.12.0.88
+opencv-contrib-python==4.8.1.78
 protobuf==6.31.1
 pyparsing==3.2.3
 six==1.17.0
