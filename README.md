@@ -9,7 +9,7 @@ It uses **PyCharm**, **Python 3.12**, and is deployed with **Docker**.
 
 ```
 blossom-lasige-research/
-├── .Dockerfile
+├── Dockerfile
 ├── .gitignore
 ├── .gitmodules
 └── open_hmi/
