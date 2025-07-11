@@ -54,5 +54,5 @@ git remote set-url origin git@github.com:DiogoSaraiva/blossom-public.git
 ```
 ##  License
 
-This project inherits the license from the original project[blossom-public](https://github.com/hrc2/blossom-public). 
+This project inherits the license from the original project [blossom-public](https://github.com/hrc2/blossom-public). 
 Additional work here present may follow additional license.
