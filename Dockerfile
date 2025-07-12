@@ -7,8 +7,8 @@ RUN apt-get update && apt-get install -y git \
 
 RUN git clone --recurse-submodules --single-branch --branch main https://github.com/DiogoSaraiva/blossom-lasige-research.git /app
 
-WORKDIR /app/open_hmi/blossom_public/
+WORKDIR /app/open_hmi/robot_server
 
-RUN pip install --no-cache-dir -r ../../requirements.txt || true
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
 ENTRYPOINT ["python", "start.py"]
