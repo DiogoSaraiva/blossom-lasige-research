@@ -2,7 +2,7 @@
 
 This repo contains my research work regarding the **LASIGE Summer of Research 2025**, based on the **Blossom** platform.
 
-It uses **PyCharm**, **Python 3.12**, and is deployed with **Docker**.
+It uses **PyCharm**, **Python 3.11.13**, and is deployed with **Docker**.
 
 
 ##   Project Structure
