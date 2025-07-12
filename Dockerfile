@@ -2,7 +2,7 @@ FROM python:3.11.13-slim
 
 LABEL authors="lasige-summer-researchers"
 
-RUN apt-get updapyte && apt-get install -y git \
+RUN apt-get update && apt-get install -y git \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN git clone --single-branch --branch main https://github.com/DiogoSaraiva/blossom-lasige-research.git /app && \
