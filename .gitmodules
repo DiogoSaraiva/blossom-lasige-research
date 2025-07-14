@@ -2,3 +2,6 @@
 	path = open_hmi
 	url = https://github.com/DiogoSaraiva/OpenHMI.git
 	branch = testing
+[submodule "blossom_public"]
+	path = blossom_public
+	url = https://github.com/DiogoSaraiva/blossom-public
