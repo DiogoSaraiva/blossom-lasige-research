@@ -1,7 +1,12 @@
 [submodule "open_hmi"]
 	path = open_hmi
 	url = https://github.com/DiogoSaraiva/OpenHMI.git
-	branch = testing
+	branch = main
 [submodule "blossom_public"]
 	path = blossom_public
 	url = https://github.com/DiogoSaraiva/blossom-public
+	branch = main
+[submodule "openface/openface_submodule"]
+	path = openface/openface_submodule
+	url = https://github.com/DiogoSaraiva/OpenFace
+    branch = main
