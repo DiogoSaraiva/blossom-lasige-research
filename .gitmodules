@@ -6,7 +6,3 @@
 	path = blossom_public
 	url = https://github.com/DiogoSaraiva/blossom-public
 	branch = main
-[submodule "openface/openface_submodule"]
-	path = openface/openface_submodule
-	url = https://github.com/DiogoSaraiva/OpenFace
-    branch = main
