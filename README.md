@@ -2,24 +2,26 @@
 
 This repo contains my research work regarding the **LASIGE Summer of Research 2025**, based on the **Blossom** platform.
 
-It uses **PyCharm**, **Python 3.11.13**, and is deployed with **Docker**.
+It is being developed with **PyCharm**, in **Python 3.11.13**, and is planned to be deployed with **Docker**.
 
 
 ##   Project Structure
 
 ```
 blossom-lasige-research/
+├── README.md
 ├── Dockerfile
 ├── .gitignore
 ├── .gitmodules
-└── open_hmi/
-    ├── blossom_public/
-    ├── Hardware/
-    ├── OpenSense Workspace/
-    ├── Robot Server Codebase/
-    ├── Skin/
-    ├── .gitmodules
-    └── README.md
+├── congruent.dockerfile
+├── open_hmi.dockerfile
+├── docker-compose.yml
+├── blossom_public/
+├── congruent/
+│   ├── src/
+│   │   └── motion_limiter.py
+│   └── pose_bridge.py
+├── open_hmi/
 
 ```
 
@@ -46,10 +48,10 @@ To change from HTTPS to SSH, run the following:
 cd blossom-lasige-research
 git remote set-url origin git@github.com:DiogoSaraiva/blossom-lasige-research.git
 
-cd open_hmi
+cd blossom-lasige-research/open_hmi
 git remote set-url origin git@github.com:DiogoSaraiva/OpenHMI.git
 
-cd blossom_public
+cd blossom-lasige-research/blossom_public
 git remote set-url origin git@github.com:DiogoSaraiva/blossom-public.git
 ```
 ##  License
