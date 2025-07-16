@@ -1,7 +1,3 @@
-[submodule "open_hmi"]
-	path = open_hmi
-	url = https://github.com/DiogoSaraiva/OpenHMI.git
-	branch = main
 [submodule "blossom_public"]
 	path = blossom_public
 	url = https://github.com/DiogoSaraiva/blossom-public

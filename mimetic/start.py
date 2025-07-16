@@ -33,13 +33,45 @@ def calculate_orientation(landmarks):
     yaw = np.arctan2(shoulder_vector[2], shoulder_vector[0]) * 180 / np.pi
     return pitch, roll, yaw
 
+import numpy as np
+
 def estimate_height(landmarks):
     nose_y = landmarks[mp_pose.PoseLandmark.NOSE].y
-    l_ankle_y = landmarks[mp_pose.PoseLandmark.LEFT_ANKLE].y
-    r_ankle_y = landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE].y
-    ankle_y = min(l_ankle_y, r_ankle_y)
-    height_ratio = max(0.0, min(1.0, (ankle_y - nose_y) * 2))
-    return int(height_ratio * 100)
+    mouth_y = (landmarks[mp_pose.PoseLandmark.MOUTH_LEFT].y + landmarks[mp_pose.PoseLandmark.MOUTH_RIGHT].y) / 2
+    head_center_y = (nose_y + mouth_y) / 2
+
+    l_shoulder = landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER]
+    r_shoulder = landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER]
+
+    shoulder_y = (l_shoulder.y + r_shoulder.y) / 2
+    vertical_diff = shoulder_y - head_center_y
+    shoulder_dx = abs(r_shoulder.x - l_shoulder.x)
+
+    # Normalize vertical posture (center of head above shoulders)
+    posture_ratio = np.clip((vertical_diff - 0.15) / (0.25 - 0.15), 0.0, 1.0)
+
+    # Normalize shoulder width (approximate depth / closeness)
+    raw_distance = (shoulder_dx - 0.28) / (0.40 - 0.28)
+    distance_ratio = np.clip(raw_distance ** 0.5, 0.0, 1.0)
+
+    # Combine both factors
+    combined = 0.8 * posture_ratio + 0.2 * distance_ratio
+
+    return int(combined * 100)
+
+
+
+
+
+def draw_overlay_info(frame, pitch, roll, yaw, height):
+    """
+    Draws pitch, roll, yaw and height info on the video frame.
+    """
+    orientation_text = f"Pitch: {pitch:.1f}  Roll: {roll:.1f}  Yaw: {yaw:.1f}"
+    height_text = f"Height: {height}"
+
+    cv2.putText(frame, orientation_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+    cv2.putText(frame, height_text, (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
 
 # Main loop
 while cap.isOpened():
@@ -62,6 +94,8 @@ while cap.isOpened():
         z = limiter.smooth("z", yaw)
         h = limiter.smooth("h", height)
 
+        draw_overlay_info(frame, pitch, roll, yaw, height)
+
         # Decide whether to send update
         should_send, duration = limiter.should_send(["x", "y", "z", "h"])
 
@@ -77,7 +111,7 @@ while cap.isOpened():
                 "az": -1,
                 "mirror": True
             }
-
+            mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
             try:
                 response = requests.post("http://robot:8000/position", json=data)
                 print(f"Sent → Pitch: {x:.1f}, Roll: {y:.1f}, Yaw: {z:.1f}, Height: {h:.1f}, Duration: {duration:.2f}s")
@@ -87,9 +121,14 @@ while cap.isOpened():
         mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
 
     cv2.imshow(CAM_VIEW_TITLE, frame)
+
     if cv2.waitKey(5) & 0xFF == 27:
         break
-    if cv2.getWindowProperty(CAM_VIEW_TITLE, cv2.WND_PROP_VISIBLE) < 1:
+
+    try:
+        if cv2.getWindowProperty(CAM_VIEW_TITLE, cv2.WND_PROP_VISIBLE) < 1:
+            break
+    except cv2.error:
         break
 
 cap.release()
