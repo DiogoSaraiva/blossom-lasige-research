@@ -1,107 +1,50 @@
-import math
-
 import cv2
 import mediapipe as mp
 import numpy as np
 import requests
+
+from src.pose_utils import PoseUtils
 from src.motion_limiter import MotionLimiter
 
 CAM_VIEW_TITLE = "Pose Estimation (Mirrored)"
 limiter = MotionLimiter()
 
-# Initialize MediaPipe Pose module and drawing utilities
-mp_pose = mp.solutions.pose
+mp_face_mesh = mp.solutions.face_mesh
+face_mesh = mp_face_mesh.FaceMesh(
+    static_image_mode=False,
+    max_num_faces=1,
+    refine_landmarks=False,
+    min_detection_confidence=0.5,
+    min_tracking_confidence=0.5
+)
 mp_drawing = mp.solutions.drawing_utils
-pose = mp_pose.Pose()
 cap = cv2.VideoCapture(0)
 
-def calculate_tilt(landmarks, frame):
-    height, width = frame.shape[:2]
-
-    l_eye = np.array([
-        landmarks[mp_pose.PoseLandmark.LEFT_EYE.value].x,
-        landmarks[mp_pose.PoseLandmark.LEFT_EYE.value].y
-    ])
-    r_eye = np.array([
-        landmarks[mp_pose.PoseLandmark.RIGHT_EYE.value].x,
-        landmarks[mp_pose.PoseLandmark.RIGHT_EYE.value].y
-    ])
-
-    x1, y1 = l_eye[0] * width, l_eye[1] * height
-    x2, y2 = r_eye[0] * width, r_eye[1] * height
-
-    dx = x2 - x1
-    dy = y2 - y1
-    angle_rad = math.atan2(dy, dx)
-    angle_deg = math.degrees(angle_rad)
-
-    return angle_deg
-
-
-def calculate_orientation(landmarks):
-
-
-
-
-
-    l_shoulder = np.array([landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER].x,
-                           landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER].y,
-                           landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER].z])
-    r_shoulder = np.array([landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER].x,
-                           landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER].y,
-                           landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER].z])
-    l_hip = np.array([landmarks[mp_pose.PoseLandmark.LEFT_HIP].x,
-                      landmarks[mp_pose.PoseLandmark.LEFT_HIP].y,
-                      landmarks[mp_pose.PoseLandmark.LEFT_HIP].z])
-    r_hip = np.array([landmarks[mp_pose.PoseLandmark.RIGHT_HIP].x,
-                      landmarks[mp_pose.PoseLandmark.RIGHT_HIP].y,
-                      landmarks[mp_pose.PoseLandmark.RIGHT_HIP].z])
-    shoulder_vector = r_shoulder - l_shoulder
-    vertical_vector = ((r_shoulder + l_shoulder) / 2) - ((r_hip + l_hip) / 2)
-    roll = np.arctan2(shoulder_vector[1], shoulder_vector[0]) * 180 / np.pi
-    pitch = np.arctan2(vertical_vector[2], vertical_vector[1]) * 180 / np.pi
-    yaw = np.arctan2(shoulder_vector[2], shoulder_vector[0]) * 180 / np.pi
-    return pitch, yaw
-
-def estimate_height(landmarks):
-    nose_y = landmarks[mp_pose.PoseLandmark.NOSE].y
-    mouth_y = (landmarks[mp_pose.PoseLandmark.MOUTH_LEFT].y + landmarks[mp_pose.PoseLandmark.MOUTH_RIGHT].y) / 2
-    head_center_y = (nose_y + mouth_y) / 2
-
-    l_shoulder = landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER]
-    r_shoulder = landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER]
-
-    shoulder_y = (l_shoulder.y + r_shoulder.y) / 2
-    vertical_diff = shoulder_y - head_center_y
-    shoulder_dx = abs(r_shoulder.x - l_shoulder.x)
-
-    # Normalize vertical posture (center of head above shoulders)
-    posture_ratio = np.clip((vertical_diff - 0.15) / (0.25 - 0.15), 0.0, 1.0)
-
-    # Normalize shoulder width (approximate depth / closeness)
-    raw_distance = (shoulder_dx - 0.28) / (0.40 - 0.28)
-    distance_ratio = np.clip(raw_distance ** 0.5, 0.0, 1.0)
-
-    # Combine both factors
-    combined = 0.8 * posture_ratio + 0.2 * distance_ratio
-
-    return int(combined * 100)
-
-
-
-
-
 def draw_overlay_info(frame, pitch, roll, yaw, height):
-    """
-    Draws pitch, roll, yaw and height info on the video frame.
-    """
     orientation_text = f"Pitch: {pitch:.1f}  Roll: {roll:.1f}  Yaw: {yaw:.1f}"
     height_text = f"Height: {height}"
-
     cv2.putText(frame, orientation_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
     cv2.putText(frame, height_text, (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
 
-# Main loop
+def draw_sent_data(frame, data, sent, pos=(10, -30)):
+    h, w = frame.shape[:2]
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 0.5
+    color = (0, 255, 0)
+    thickness = 1
+    line_height = 20
+
+    lines = [
+        f"Calculated: P={data['x']:.3f}, R={data['y']:.3f}, Y={data['z']:.3f}, H={data['h']:.3f}",
+        f"Sent:       P={sent['x']:.3f}, R={sent['y']:.3f}, Y={sent['z']:.3f}, H={sent['h']:.3f}"
+    ]
+
+    for i, text in enumerate(lines):
+        text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
+        x = w - text_size[0] - 10
+        y = h + (pos[1] if pos[1] < 0 else 0) - (len(lines) - i) * line_height
+        cv2.putText(frame, text, (x, y), font, font_scale, color, thickness)
+
 while cap.isOpened():
     success, frame = cap.read()
     if not success:
@@ -109,55 +52,60 @@ while cap.isOpened():
 
     frame = cv2.flip(frame, 1)
     image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    results = pose.process(image_rgb)
+    results = face_mesh.process(image_rgb)
 
-    if hasattr(results, 'pose_landmarks') and results.pose_landmarks:
-        lm = results.pose_landmarks.landmark
-        pitch, yaw = calculate_orientation(lm)
-        roll = calculate_tilt(lm, frame)
+    if results.multi_face_landmarks:  # type: ignore
+        face_landmarks = results.multi_face_landmarks[0]  # type: ignore
+        pose_utils = PoseUtils(face_landmarks.landmark, frame)
 
-        height = estimate_height(lm)
+        roll = pose_utils.calculate_roll()
+        pitch = pose_utils.calculate_pitch()
+        yaw = pose_utils.calculate_yaw()
+        height = pose_utils.estimate_height()
 
-        # Smooth all relevant axes
-        x = limiter.smooth("x", pitch)
-        y = limiter.smooth("y", roll)
-        z = limiter.smooth("z", yaw)
-        h = limiter.smooth("h", height)
+        x = limiter.smooth('x', pitch)
+        y = limiter.smooth('y', roll)
+        z = limiter.smooth('z', yaw)
+        h = limiter.smooth('h', height)
+        e = limiter.smooth('e', height)
 
         draw_overlay_info(frame, pitch, roll, yaw, height)
-        # Decide whether to send update
+
         should_send, duration = limiter.should_send(["x", "y", "z", "h"])
 
+        data = {
+            "x": x,
+            "y": y,
+            "z": z,
+            "h": h,
+            "ears": e,
+            "ax": 0,
+            "ay": 0,
+            "az": -1,
+            "mirror": True
+        }
+
+        sent_data = data if should_send else {"x": 0, "y": 0, "z": 0, "h": 0}
+        draw_sent_data(frame, data, sent_data)
+
         if should_send:
-            data = {
-                "x": x,
-                "y": y,
-                "z": z,
-                "h": h,
-                "ears": limiter.smooth("e", h),  # optional: ears follow height
-                "ax": 0,
-                "ay": 0,
-                "az": -1,
-                "mirror": True
-            }
-            mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
             try:
-                response = requests.post("http://localhost:8000/position", json=data)
-                print(f"Sent → Pitch: {x:.1f}, Roll: {y:.1f}, Yaw: {z:.1f}, Height: {h:.1f}, Duration: {duration:.2f}s")
+                requests.post("http://localhost:8000/position", json=data)
+                print(f"Sent -> Pitch: {x:.3f}, Roll: {y:.3f}, Yaw: {z:.3f}, Height: {h:.3f}, Duration: {duration:.2f}s")
             except Exception as e:
                 print("Error sending to Blossom:", e)
 
-
-
-        mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
-
+        mp_drawing.draw_landmarks(
+            frame,
+            face_landmarks,
+            mp_face_mesh.FACEMESH_TESSELATION,
+            landmark_drawing_spec=None,
+            connection_drawing_spec=mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
+        )
 
     cv2.imshow(CAM_VIEW_TITLE, frame)
-
-
     if cv2.waitKey(5) & 0xFF == 27:
         break
-
     try:
         if cv2.getWindowProperty(CAM_VIEW_TITLE, cv2.WND_PROP_VISIBLE) < 1:
             break

@@ -3,7 +3,6 @@ import numpy as np
 
 class MotionLimiter:
     def __init__(self, alpha_map=None, rate_hz=10, threshold=2.0):
-        # Custom smoothing factor (alpha) per axis
         self.alpha_map = alpha_map or {
             "x": 0.3,  # pitch
             "y": 0.2,  # roll
@@ -11,7 +10,6 @@ class MotionLimiter:
             "h": 0.3,  # height
             "e": 0.2   # ears
         }
-        # Initial smoothed values
         self.smoothed = {
             "x": 0.0,
             "y": 0.0,
@@ -19,13 +17,44 @@ class MotionLimiter:
             "h": 50.0,
             "e": 70.0
         }
-        # State for rate limiting and change detection
         self.last_sent = 0
         self.min_interval = 1.0 / rate_hz
         self.threshold = threshold
         self.last_data = self.smoothed.copy()
 
+    @staticmethod
+    def to_six_unit_range(value, min_val, max_val):
+        """Maps a value in [min_val, max_val] to [0, 6] linearly."""
+        return np.clip((value - min_val) / (max_val - min_val), 0.0, 1.0) * 6.0
+
+    def smooth_and_scale(self, key, value):
+        smoothed = self._smooth(key, value)
+
+        match key:
+            case "x" | "y":
+                return self.to_six_unit_range(np.clip(smoothed, -150, 150), -150, 150)
+            case "z":
+                return self.to_six_unit_range(np.clip(smoothed, -40, 40), 0, 100)
+            case "h":
+                return self.to_six_unit_range(np.clip(smoothed, 0, 100), 0, 100)
+            case "e":
+                return self.to_six_unit_range(np.clip(smoothed, 50, 130), 50, 130)
+            case _:
+                return smoothed
+
+
     def smooth(self, key, value):
+        match key:
+            case "x" | "y":
+                return self.smooth_and_scale("x", value)
+            case "z":
+                return self.smooth_and_scale("z", value)
+            case "h":
+                return self.smooth_and_scale("h", value)
+            case "e":
+                return self.smooth_and_scale("e", value)
+
+    def _smooth(self, key, value):
         alpha = self.alpha_map.get(key, 0.3)
         prev = self.smoothed.get(key, 0.0)
         smoothed = alpha * value + (1 - alpha) * prev
