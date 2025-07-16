@@ -8,9 +8,9 @@ RUN apt-get update && \
 
 WORKDIR /app
 COPY blossom_public ./blossom_public
-COPY congruent ./congruent
+COPY mimetic ./congruent
 
-RUN pip install --no-cache-dir -r /app/congruent/requirements.txt
+RUN pip install --no-cache-dir -r /app/mimetic/requirements.txt
 
 WORKDIR /app/congruent
 
