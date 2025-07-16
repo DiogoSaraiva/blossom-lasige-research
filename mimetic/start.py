@@ -1,3 +1,5 @@
+import math
+
 import cv2
 import mediapipe as mp
 import numpy as np
@@ -13,7 +15,35 @@ mp_drawing = mp.solutions.drawing_utils
 pose = mp_pose.Pose()
 cap = cv2.VideoCapture(0)
 
+def calculate_tilt(landmarks, frame):
+    height, width = frame.shape[:2]
+
+    l_eye = np.array([
+        landmarks[mp_pose.PoseLandmark.LEFT_EYE.value].x,
+        landmarks[mp_pose.PoseLandmark.LEFT_EYE.value].y
+    ])
+    r_eye = np.array([
+        landmarks[mp_pose.PoseLandmark.RIGHT_EYE.value].x,
+        landmarks[mp_pose.PoseLandmark.RIGHT_EYE.value].y
+    ])
+
+    x1, y1 = l_eye[0] * width, l_eye[1] * height
+    x2, y2 = r_eye[0] * width, r_eye[1] * height
+
+    dx = x2 - x1
+    dy = y2 - y1
+    angle_rad = math.atan2(dy, dx)
+    angle_deg = math.degrees(angle_rad)
+
+    return angle_deg
+
+
 def calculate_orientation(landmarks):
+
+
+
+
+
     l_shoulder = np.array([landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER].x,
                            landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER].y,
                            landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER].z])
@@ -31,9 +61,7 @@ def calculate_orientation(landmarks):
     roll = np.arctan2(shoulder_vector[1], shoulder_vector[0]) * 180 / np.pi
     pitch = np.arctan2(vertical_vector[2], vertical_vector[1]) * 180 / np.pi
     yaw = np.arctan2(shoulder_vector[2], shoulder_vector[0]) * 180 / np.pi
-    return pitch, roll, yaw
-
-import numpy as np
+    return pitch, yaw
 
 def estimate_height(landmarks):
     nose_y = landmarks[mp_pose.PoseLandmark.NOSE].y
@@ -85,7 +113,9 @@ while cap.isOpened():
 
     if hasattr(results, 'pose_landmarks') and results.pose_landmarks:
         lm = results.pose_landmarks.landmark
-        pitch, roll, yaw = calculate_orientation(lm)
+        pitch, yaw = calculate_orientation(lm)
+        roll = calculate_tilt(lm, frame)
+
         height = estimate_height(lm)
 
         # Smooth all relevant axes
@@ -95,7 +125,6 @@ while cap.isOpened():
         h = limiter.smooth("h", height)
 
         draw_overlay_info(frame, pitch, roll, yaw, height)
-
         # Decide whether to send update
         should_send, duration = limiter.should_send(["x", "y", "z", "h"])
 
@@ -113,14 +142,18 @@ while cap.isOpened():
             }
             mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
             try:
-                response = requests.post("http://robot:8000/position", json=data)
+                response = requests.post("http://localhost:8000/position", json=data)
                 print(f"Sent → Pitch: {x:.1f}, Roll: {y:.1f}, Yaw: {z:.1f}, Height: {h:.1f}, Duration: {duration:.2f}s")
             except Exception as e:
                 print("Error sending to Blossom:", e)
 
+
+
         mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
 
+
     cv2.imshow(CAM_VIEW_TITLE, frame)
+
 
     if cv2.waitKey(5) & 0xFF == 27:
         break
