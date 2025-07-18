@@ -5,9 +5,21 @@ import time
 from mimetic.src.visual_utils import Visualization
 from src.pose_utils import PoseUtils
 from src.motion_limiter import MotionLimiter
+import argparse
 
 CAM_VIEW_TITLE = "Pose Estimation (Mirrored)"
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Mimetic Blossom Controller")
+    parser.add_argument("--host", default="localhost", help="IP address of the Blossom server (default: localhost)")
+    parser.add_argument("--port", type=int, default=8000, help="Port of the Blossom server (default: 8000)")
+    return parser.parse_args()
+
+args = parse_args()
+
 limiter = MotionLimiter()
+
 
 mp_face_mesh = mp.solutions.face_mesh
 face_mesh = mp_face_mesh.FaceMesh(
@@ -104,7 +116,7 @@ while cap.isOpened():
         if should_send:
             data["duration"] = int(duration * 1000)
             try:
-                requests.post("http://localhost:8000/position", json=data)
+                requests.post(f"http://{args.host}:{args.port}/position", json=data)
                 print(f"Sent -> Pitch: {x:.3f}, Roll: {y:.3f}, Yaw: {z:.3f}, Height: {h:.3f}, Duration: {duration:.2f}s")
             except Exception as e:
                 print("Error sending to Blossom:", e)
