@@ -1,5 +1,6 @@
 import math
 import numpy as np
+import mediapipe as mp
 
 FACE_MESH_LANDMARKS = {
     'left_eye': 33,
@@ -14,9 +15,17 @@ FACE_MESH_LANDMARKS = {
 }
 
 class PoseUtils:
-    def __init__(self, face_landmarks, frame):
-        self.landmarks = face_landmarks
+    def __init__(self, facemesh_landmarks=None, pose_landmarks=None, frame=None):
+        self.landmarks = facemesh_landmarks
         self.frame = frame
+        self.mp_pose = mp.solutions.pose
+        self.pose_landmarks = pose_landmarks
+
+    def update(self, facemesh_landmarks, pose_landmarks, frame):
+        self.landmarks = facemesh_landmarks
+        self.frame = frame
+        self.mp_pose = mp.solutions.pose
+        self.pose_landmarks = pose_landmarks
 
     def calculate_roll(self):
         h, w = self.frame.shape[:2]
@@ -38,5 +47,30 @@ class PoseUtils:
         return math.degrees(math.atan2(right.z - left.z, right.x - left.x))
 
     def estimate_height(self):
-      return 50
-      # TODO
+        nose_y = self.landmarks[FACE_MESH_LANDMARKS['nose_tip']].y
+        mouth_y = (
+                          self.pose_landmarks[self.mp_pose.PoseLandmark.MOUTH_LEFT].y +
+                          self.pose_landmarks[self.mp_pose.PoseLandmark.MOUTH_RIGHT].y
+                  ) / 2
+        head_center_y = (nose_y + mouth_y) / 2
+
+        l_shoulder = self.pose_landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER]
+        r_shoulder = self.pose_landmarks[self.mp_pose.PoseLandmark.RIGHT_SHOULDER]
+
+        shoulder_y = (l_shoulder.y + r_shoulder.y) / 2
+        vertical_diff = shoulder_y - head_center_y
+        shoulder_dx = abs(r_shoulder.x - l_shoulder.x)
+
+        if shoulder_dx < 0.01:
+            return None
+
+        posture_ratio = np.clip((vertical_diff - 0.15) / (0.25 - 0.15), 0.0, 1.0)
+
+        raw_distance = (shoulder_dx - 0.28) / (0.40 - 0.28)
+        raw_distance = max(raw_distance, 0.0)
+        distance_ratio = np.clip(raw_distance ** 0.5, 0.0, 1.0)
+
+        combined = 0.8 * posture_ratio + 0.2 * distance_ratio
+        return int(combined * 100)
+
+

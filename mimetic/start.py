@@ -1,13 +1,26 @@
 import cv2
 import mediapipe as mp
-import numpy as np
 import requests
-
+import time
+from mimetic.src.visual_utils import Visualization
 from src.pose_utils import PoseUtils
 from src.motion_limiter import MotionLimiter
+import argparse
+from src.config import MIRROR_VIDEO
 
-CAM_VIEW_TITLE = "Pose Estimation (Mirrored)"
+CAM_VIEW_TITLE = "Pose Estimation " +  " (Mirrored)" if MIRROR_VIDEO else ""
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Mimetic Blossom Controller")
+    parser.add_argument("--host", default="localhost", help="IP address of the Blossom server (default: localhost)")
+    parser.add_argument("--port", type=int, default=8000, help="Port of the Blossom server (default: 8000)")
+    return parser.parse_args()
+
+args = parse_args()
+
 limiter = MotionLimiter()
+
 
 mp_face_mesh = mp.solutions.face_mesh
 face_mesh = mp_face_mesh.FaceMesh(
@@ -17,46 +30,39 @@ face_mesh = mp_face_mesh.FaceMesh(
     min_detection_confidence=0.5,
     min_tracking_confidence=0.5
 )
+mp_pose = mp.solutions.pose
+pose = mp_pose.Pose(
+    static_image_mode=False,
+    model_complexity=0,
+    enable_segmentation=False,
+    min_detection_confidence=0.5,
+    min_tracking_confidence=0.5
+)
+
 mp_drawing = mp.solutions.drawing_utils
 cap = cv2.VideoCapture(0)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
-def draw_overlay_info(frame, pitch, roll, yaw, height):
-    orientation_text = f"Pitch: {pitch:.1f}  Roll: {roll:.1f}  Yaw: {yaw:.1f}"
-    height_text = f"Height: {height}"
-    cv2.putText(frame, orientation_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
-    cv2.putText(frame, height_text, (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
-
-def draw_sent_data(frame, data, sent, pos=(10, -30)):
-    h, w = frame.shape[:2]
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    font_scale = 0.5
-    color = (0, 255, 0)
-    thickness = 1
-    line_height = 20
-
-    lines = [
-        f"Calculated: P={data['x']:.3f}, R={data['y']:.3f}, Y={data['z']:.3f}, H={data['h']:.3f}",
-        f"Sent:       P={sent['x']:.3f}, R={sent['y']:.3f}, Y={sent['z']:.3f}, H={sent['h']:.3f}"
-    ]
-
-    for i, text in enumerate(lines):
-        text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
-        x = w - text_size[0] - 10
-        y = h + (pos[1] if pos[1] < 0 else 0) - (len(lines) - i) * line_height
-        cv2.putText(frame, text, (x, y), font, font_scale, color, thickness)
+prev_time = time.time()
 
 while cap.isOpened():
     success, frame = cap.read()
     if not success:
         break
 
-    frame = cv2.flip(frame, 1)
+    frame = cv2.flip(frame, 1) if MIRROR_VIDEO else frame
     image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    results = face_mesh.process(image_rgb)
+    mesh_results = face_mesh.process(image_rgb)
+    pose_results = pose.process(image_rgb)
 
-    if results.multi_face_landmarks:  # type: ignore
-        face_landmarks = results.multi_face_landmarks[0]  # type: ignore
-        pose_utils = PoseUtils(face_landmarks.landmark, frame)
+    face_detected = mesh_results.multi_face_landmarks # type: ignore
+    body_detected = pose_results.pose_landmarks # type: ignore
+
+    if face_detected and body_detected:
+        face_landmarks = face_detected[0]
+        pose_landmarks = pose_results.pose_landmarks.landmark # type: ignore
+        pose_utils = PoseUtils(face_landmarks.landmark, pose_landmarks, frame)
 
         roll = pose_utils.calculate_roll()
         pitch = pose_utils.calculate_pitch()
@@ -69,7 +75,7 @@ while cap.isOpened():
         h = limiter.smooth('h', height)
         e = limiter.smooth('e', height)
 
-        draw_overlay_info(frame, pitch, roll, yaw, height)
+        axis = { 'pitch': pitch, 'roll': roll, 'yaw': yaw }
 
         should_send, duration = limiter.should_send(["x", "y", "z", "h"])
 
@@ -82,26 +88,39 @@ while cap.isOpened():
             "ax": 0,
             "ay": 0,
             "az": -1,
-            "mirror": True
+            "mirror": True,
+            "duration_ms": int(duration * 1000) if duration else 500
         }
 
+        current_time = time.time()
+        fps = 1.0 / (current_time - prev_time)
+        prev_time = current_time
+
+
         sent_data = data if should_send else {"x": 0, "y": 0, "z": 0, "h": 0}
-        draw_sent_data(frame, data, sent_data)
+        info = {
+            "axis": axis,
+            "blossom_data": {
+                "calc_data":
+                    {"x": x, "y": y, "z": z, "h": h},
+                "sent_data": sent_data
+            },
+            "height": height,
+            "fps": fps}
+        visualization = Visualization(frame, mesh_results, pose_results, info)
+
+        visualization.draw_overlay_data()
+        visualization.draw_sent_data()
+        visualization.draw_landmarks()
+        visualization.draw_shoulder_line()
 
         if should_send:
+            data["duration"] = int(duration * 1000)
             try:
-                requests.post("http://localhost:8000/position", json=data)
+                requests.post(f"http://{args.host}:{args.port}/position", json=data)
                 print(f"Sent -> Pitch: {x:.3f}, Roll: {y:.3f}, Yaw: {z:.3f}, Height: {h:.3f}, Duration: {duration:.2f}s")
             except Exception as e:
                 print("Error sending to Blossom:", e)
-
-        mp_drawing.draw_landmarks(
-            frame,
-            face_landmarks,
-            mp_face_mesh.FACEMESH_TESSELATION,
-            landmark_drawing_spec=None,
-            connection_drawing_spec=mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
-        )
 
     cv2.imshow(CAM_VIEW_TITLE, frame)
     if cv2.waitKey(5) & 0xFF == 27:
@@ -113,4 +132,6 @@ while cap.isOpened():
         break
 
 cap.release()
+face_mesh.close()
+pose.close()
 cv2.destroyAllWindows()

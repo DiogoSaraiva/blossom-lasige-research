@@ -1,14 +1,15 @@
 import time
 import numpy as np
 
+
 class MotionLimiter:
-    def __init__(self, alpha_map=None, rate_hz=10, threshold=2.0):
+    def __init__(self, alpha_map=None, rate_hz=5, threshold=2.0):
         self.alpha_map = alpha_map or {
             "x": 0.3,  # pitch
             "y": 0.2,  # roll
             "z": 0.1,  # yaw
             "h": 0.3,  # height
-            "e": 0.2   # ears
+            "e": 0.2  # ears
         }
         self.smoothed = {
             "x": 0.0,
@@ -21,6 +22,7 @@ class MotionLimiter:
         self.min_interval = 1.0 / rate_hz
         self.threshold = threshold
         self.last_data = self.smoothed.copy()
+        self.values = {}
 
     @staticmethod
     def to_six_unit_range(value, min_val, max_val):
@@ -41,7 +43,6 @@ class MotionLimiter:
                 return self.to_six_unit_range(np.clip(smoothed, 50, 130), 50, 130)
             case _:
                 return smoothed
-
 
     def smooth(self, key, value):
         match key:
@@ -74,3 +75,10 @@ class MotionLimiter:
             return True, duration
 
         return False, None
+
+    def last(self, key):
+        """
+        Returns the last smoothed value for the given key.
+        If no value is stored, returns 0.
+        """
+        return self.values.get(key, 0)

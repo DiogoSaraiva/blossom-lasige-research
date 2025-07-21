@@ -9,19 +9,19 @@ It is being developed with **PyCharm**, in **Python 3.11.13**, and is planned to
 
 ```
 blossom-lasige-research/
+├── start.py
 ├── README.md
-├── Dockerfile
 ├── .gitignore
 ├── .gitmodules
-├── congruent.dockerfile
-├── open_hmi.dockerfile
-├── docker-compose.yml
 ├── blossom_public/
-├── congruent/
+│   ├── src/
+│   │   └── server.py
+│   └── start.py
+├── mimetic/
 │   ├── src/
 │   │   └── motion_limiter.py
-│   └── pose_bridge.py
-├── open_hmi/
+│   └── start.py
+├── dancer
 
 ```
 
