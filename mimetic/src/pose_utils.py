@@ -14,6 +14,13 @@ FACE_MESH_LANDMARKS = {
     'right_shoulder': 454
 }
 
+POSE_LANDMARKS = {
+    'left_shoulder': 11,
+    'right_shoulder': 12,
+    'mouth_left': 9,
+    'mouth_right': 10
+}
+
 class PoseUtils:
     def __init__(self, facemesh_landmarks=None, pose_landmarks=None, frame=None):
         self.landmarks = facemesh_landmarks
@@ -48,14 +55,13 @@ class PoseUtils:
 
     def estimate_height(self):
         nose_y = self.landmarks[FACE_MESH_LANDMARKS['nose_tip']].y
-        mouth_y = (
-                          self.pose_landmarks[self.mp_pose.PoseLandmark.MOUTH_LEFT].y +
-                          self.pose_landmarks[self.mp_pose.PoseLandmark.MOUTH_RIGHT].y
-                  ) / 2
+        mouth_left_y = self.pose_landmarks[POSE_LANDMARKS['mouth_left']].y
+        mouth_right_y = self.pose_landmarks[POSE_LANDMARKS['mouth_right']].y
+        mouth_y = (mouth_left_y + mouth_right_y) / 2
         head_center_y = (nose_y + mouth_y) / 2
 
-        l_shoulder = self.pose_landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER]
-        r_shoulder = self.pose_landmarks[self.mp_pose.PoseLandmark.RIGHT_SHOULDER]
+        l_shoulder = self.pose_landmarks[POSE_LANDMARKS['left_shoulder']]
+        r_shoulder = self.pose_landmarks[POSE_LANDMARKS['right_shoulder']]
 
         shoulder_y = (l_shoulder.y + r_shoulder.y) / 2
         vertical_diff = shoulder_y - head_center_y

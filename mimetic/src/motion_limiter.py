@@ -54,6 +54,7 @@ class MotionLimiter:
                 return self.smooth_and_scale("h", value)
             case "e":
                 return self.smooth_and_scale("e", value)
+        return None
 
     def _smooth(self, key, value):
         alpha = self.alpha_map.get(key, 0.3)

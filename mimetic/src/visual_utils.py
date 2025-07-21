@@ -2,12 +2,20 @@ import cv2
 import mediapipe as mp
 
 mp_drawing = mp.solutions.drawing_utils
-mp_face_mesh = mp.solutions.face_mesh
-mp_pose = mp.solutions.pose
-TESSELATION = mp_face_mesh.FACEMESH_TESSELATION
 
 class Visualization:
-    def __init__(self, frame, mesh_results, pose_results, info):
+    def __init__(self, frame=None, mesh_results=None, pose_results=None, info=None):
+        self.frame = frame
+        self.mesh_results = mesh_results
+        self.pose_results = pose_results
+        self.axis = {'pitch': 0.0, 'roll': 0.0, 'yaw': 0.0}
+        self.height = 0.0
+        self.fps = None
+        self.calc_data = {'x': 0.0, 'y': 0.0, 'z': 0.0, 'h': 0.0}
+        self.sent_data = {'x': 0.0, 'y': 0.0, 'z': 0.0, 'h': 0.0}
+
+
+    def update(self, frame, mesh_results, pose_results, info):
         self.frame = frame
         self.mesh_results = mesh_results
         self.pose_results = pose_results
@@ -19,24 +27,29 @@ class Visualization:
         self.sent_data = blossom_data['sent_data']
 
     def draw_landmarks(self):
-        if self.mesh_results.multi_face_landmarks:
-            mp_drawing.draw_landmarks(
-                self.frame,
-                self.mesh_results.multi_face_landmarks[0],
-                TESSELATION,
-                landmark_drawing_spec=None,
-                connection_drawing_spec=mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
-            )
+        if self.mesh_results.face_landmarks:
+            for landmark in self.mesh_results.face_landmarks[0]:
+                x = int(landmark.x * self.frame.shape[1])
+                y = int(landmark.y * self.frame.shape[0])
+                cv2.circle(self.frame, (x, y), 1, (0, 255, 0), -1)
+
+        # Pose landmarks
+        if self.pose_results.pose_landmarks:
+            for landmark in self.pose_results.pose_landmarks[0]:
+                x = int(landmark.x * self.frame.shape[1])
+                y = int(landmark.y * self.frame.shape[0])
+                cv2.circle(self.frame, (x, y), 2, (255, 0, 0), -1)
 
     def draw_shoulder_line(self):
         if self.pose_results.pose_landmarks:
-            h, w = self.frame.shape[:2]
-            lm = self.pose_results.pose_landmarks.landmark
-            left = lm[mp_pose.PoseLandmark.LEFT_SHOULDER]
-            right = lm[mp_pose.PoseLandmark.RIGHT_SHOULDER]
-            x1, y1 = int(left.x * w), int(left.y * h)
-            x2, y2 = int(right.x * w), int(right.y * h)
-            cv2.line(self.frame, (x1, y1), (x2, y2), (255, 255, 255), 1)
+            lm = self.pose_results.pose_landmarks[0]
+            if len(lm) > 12:  # até aos ombros
+                h, w = self.frame.shape[:2]
+                left = lm[11]
+                right = lm[12]
+                x1, y1 = int(left.x * w), int(left.y * h)
+                x2, y2 = int(right.x * w), int(right.y * h)
+                cv2.line(self.frame, (x1, y1), (x2, y2), (255, 255, 255), 1)
 
     def draw_overlay_data(self):
         h, w = self.frame.shape[:2]
@@ -80,3 +93,9 @@ class Visualization:
             x = w - size[0] - 10
             y = h - (len(lines) - i) * line_height - 10
             cv2.putText(self.frame, text, (x, y), font, scale, color, thickness)
+    def render(self):
+        """Draw all overlays on the current frame."""
+        self.draw_overlay_data()
+        self.draw_sent_data()
+        self.draw_landmarks()
+        self.draw_shoulder_line()
