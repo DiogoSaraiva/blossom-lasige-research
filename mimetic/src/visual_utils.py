@@ -97,5 +97,5 @@ class Visualization:
         """Draw all overlays on the current frame."""
         self.draw_overlay_data()
         self.draw_sent_data()
-        self.draw_landmarks()
-        self.draw_shoulder_line()
+        #  self.draw_landmarks()
+        # self.draw_shoulder_line()
