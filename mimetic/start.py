@@ -1,160 +1,189 @@
-from argparse import ArgumentParser
-import cv2
-import mediapipe as mp
-from mediapipe.tasks.python.core.base_options import BaseOptions
-from mediapipe.tasks.python import vision
-import requests
 import time
-from mediapipe.tasks.python.vision import (
-    FaceLandmarkerResult, FaceLandmarkerOptions,
-    PoseLandmarkerResult, PoseLandmarkerOptions
-)
+from datetime import datetime
+
+import cv2
+
+from mimetic.src.motion_limiter import MotionLimiter
 from mimetic.src.stream_buffer import ResultBuffer
+from mimetic.src.threads.AutonomousRecorderThread import AutonomousRecorderThread
+from mimetic.src.threads.blossom_sender import BlossomSenderThread
+from mimetic.src.threads.frame_capture import FrameCaptureThread
+from mimetic.src.threads.mediapipe_thread import MediaPipeThread
 from mimetic.src.visual_utils import Visualization
-from src.pose_utils import PoseUtils
-from src.motion_limiter import MotionLimiter
-from src.config import MIRROR_VIDEO, VIDEO_WIDTH, VIDEO_HEIGHT
-from src.recording_tools import RecordingTools
+from src.logging_utils import Logger
+from src.recording_tools import Recorder
 
-parser = ArgumentParser(description="Mimetic Blossom Controller")
-parser.add_argument("--host", default="localhost", help="IP address of the Blossom server (default: localhost)")
-parser.add_argument("--port", type=int, default=8000, help="Port of the Blossom server (default: 8000)")
-parser.add_argument("--record", type=RecordingTools.str2bool, default=False, help="Enable video recording (true/false)",
-)
-CAM_VIEW_TITLE = "Pose Estimation " + " (Mirrored)" if MIRROR_VIDEO else ""
-args = parser.parse_args()
 
-limiter = MotionLimiter()
-visualization = Visualization()
+class Mimetic:
+    def __init__(self, output_folder: str, study_id: str or int, host: str, port: int, mirror_video: bool = True):
+        study_timestamp = self.compact_timestamp()
+        self.study_id = study_id or study_timestamp
+        self.host = host
+        self.port = port
+        self.mirror_video = mirror_video
 
-cap = cv2.VideoCapture(0)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, VIDEO_WIDTH)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, VIDEO_HEIGHT)
+        self.logger = Logger(f"{output_folder}/{self.study_id}_log.json")
+        self.recorder = Recorder(f"{output_folder}/{self.study_id}_recording.mp4")
+        self.limiter = MotionLimiter()
+        self.visualization = Visualization()
+        self.buffer = ResultBuffer()
 
-buffer = ResultBuffer()
-recorder = RecordingTools()
-if args.record:
-    recorder.start_recording()
+        self.cam_view_title = "Pose Estimation " + " (Mirrored)" if mirror_video else ""
+        self.running = True
 
-def face_callback(result: FaceLandmarkerResult, output_image: mp.Image, timestamp_ms: int):
-    buffer.add("face", result, timestamp_ms)
+    def main(self):
+        capture_thread = FrameCaptureThread()
+        capture_thread.start()
 
-def pose_callback(result: PoseLandmarkerResult, output_image: mp.Image, timestamp_ms: int):
-    buffer.add("pose", result, timestamp_ms)
+        timeout_sec = 5
+        interval_sec = 0.01
+        max_attempts = int(timeout_sec / interval_sec)
 
-face_options = FaceLandmarkerOptions(
-    base_options=BaseOptions(model_asset_path="models/face_landmarker.task", delegate=BaseOptions.Delegate.GPU),
-    running_mode=vision.RunningMode.LIVE_STREAM,
-    result_callback=face_callback
-)
-face_landmarker = vision.FaceLandmarker.create_from_options(face_options)
-
-pose_options = PoseLandmarkerOptions(
-    base_options=BaseOptions(model_asset_path="models/pose_landmarker_full.task", delegate=BaseOptions.Delegate.GPU),
-    running_mode=vision.RunningMode.LIVE_STREAM,
-    result_callback=pose_callback
-)
-pose_landmarker = vision.PoseLandmarker.create_from_options(pose_options)
-
-prev_time = time.time()
-frame_count = 0
-try:
-    while cap.isOpened():
-        frame_count += 1
-        success, frame = cap.read()
-        if not success:
-            break
-
-        frame = cv2.flip(frame, 1) if MIRROR_VIDEO else frame
-
-        image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image_rgb)
-
-        timestamp = int(time.time() * 1000)
-        face_landmarker.detect_async(mp_image, timestamp)
-        pose_landmarker.detect_async(mp_image, timestamp)
-
-        face_results, pose_results = buffer.get_latest_complete()
-
-        current_time = time.time()
-        fps = 1.0 / (current_time - prev_time)
-        prev_time = current_time
-        print(f"FPS: {fps:.2f}")
-
-        if  pose_results and face_results and pose_results.pose_landmarks and face_results.face_landmarks:
-            face_landmarks   = face_results.face_landmarks[0]
-            pose_landmarks = pose_results.pose_landmarks[0]
-
-            pose_utils = PoseUtils(face_landmarks, pose_landmarks, frame)
-
-            roll = pose_utils.calculate_roll()
-            pitch = pose_utils.calculate_pitch()
-            yaw = pose_utils.calculate_yaw()
-            height = pose_utils.estimate_height()
-
-            x = limiter.smooth('x', pitch)
-            y = limiter.smooth('y', roll)
-            z = limiter.smooth('z', yaw)
-            h = limiter.smooth('h', height)
-            e = limiter.smooth('e', height)
-
-            axis = { 'pitch': pitch, 'roll': roll, 'yaw': yaw }
-            should_send, duration = limiter.should_send(["x", "y", "z", "h"])
-
-            payload = {
-                "x": x,
-                "y": y,
-                "z": z,
-                "h": h,
-                "ears": e,
-                "ax": 0,
-                "ay": 0,
-                "az": -1,
-                "mirror": True,
-                "duration_ms": int(duration * 1000) if duration else 500
-            }
-
-            sent_data = payload if should_send else {"x": 0, "y": 0, "z": 0, "h": 0}
-            data = {
-                "axis": axis,
-                "blossom_data": {
-                    "calc_data": {"x": x, "y": y, "z": z, "h": h},
-                    "sent_data": sent_data
-                },
-                "height": height,
-                "fps": fps
-            }
-            visualization.update(frame, face_results, pose_results, data)
-            visualization.render()
-
-            if args.record:
-                recorder.write_frame(frame)
-
-            if should_send:
-                try:
-                    requests.post(f"http://{args.host}:{args.port}/position", json=payload)
-                    print(
-                        f"Sent -> Pitch: {x:.3f}, Roll: {y:.3f}, Yaw: {z:.3f}, Height: {h:.3f}, Duration: {duration:.2f}s")
-                except Exception as e:
-                    print("Error sending to Blossom:", e)
-
-        cv2.imshow(CAM_VIEW_TITLE, frame)
-        if cv2.waitKey(5) & 0xFF == 27:
-            break
-        try:
-            if cv2.getWindowProperty(CAM_VIEW_TITLE, cv2.WND_PROP_VISIBLE) < 1:
+        for _ in range(max_attempts):
+            frame_display = capture_thread.get_frame(mirror_video=True)
+            if frame_display is not None and frame_display.size > 0:
                 break
-        except cv2.error:
-            break
+            time.sleep(interval_sec)
+        else:
+            raise RuntimeError("Failed to capture initial frame within timeout.")
 
-except Exception as e:
-    print(f"[ERROR] Crash: {e}")
-finally:
-    #Cleanup
-    print("[INFO] Cleaning up...")
-    recorder.stop_recording()
-    cap.release()
-    pose_landmarker.close()
-    face_landmarker.close()
-    cv2.destroyAllWindows()
-    print("[INFO] Shutdown complete.")
+        height, width = frame_display.shape[:2]
+        print(f"[INFO] Detected resolution: {width}x{height}")
+        blossom_sender = BlossomSenderThread(host=self.host, port=self.port)
+        mp_thread = MediaPipeThread(result_buffer=self.buffer)
+
+        blossom_sender.start()
+        mp_thread.start()
+
+        recorder_thread = AutonomousRecorderThread(self.recorder, capture_thread, resolution=(width, height), fps=30, mirror=self.mirror_video)
+        recorder_thread.start()
+
+        last_pose_data = None
+
+        prev_time = time.time()
+
+        try:
+            while self.running:
+                frame_display = capture_thread.get_frame(mirror_video=True)
+
+                # Full resolution for display/recording
+                if frame_display is not None:
+                    height, width = frame_display.shape[:2]
+
+                # Reduced resolution for MediaPipe
+                frame_mp = capture_thread.get_frame(mirror_video=self.mirror_video,  width=min(320, width), height=min(180, height))
+                if frame_mp is None:
+                    continue
+                mp_thread.send(frame_mp)
+
+                # Read results
+                pose_data, _ = self.buffer.get_latest_pose_data()
+                if pose_data is not None:
+                    last_pose_data = pose_data
+
+                if last_pose_data is None:
+                    continue  # wait until first pose is available
+
+                pitch = last_pose_data["pitch"]
+                roll = last_pose_data["roll"]
+                yaw = last_pose_data["yaw"]
+                height = last_pose_data["height"]
+
+                current_time = time.time()
+                fps = 1.0 / (current_time - prev_time)
+                prev_time = current_time
+
+                x = self.limiter.smooth('x', pitch)
+                y = self.limiter.smooth('y', roll)
+                z = self.limiter.smooth('z', yaw)
+                h = self.limiter.smooth('h', height)
+                e = self.limiter.smooth('e', height)
+
+                axis = {'pitch': pitch, 'roll': roll, 'yaw': yaw}
+                should_send, duration = self.limiter.should_send(["x", "y", "z", "h"])
+
+                payload = {
+                    "x": x,
+                    "y": y,
+                    "z": z,
+                    "h": h,
+                    "ears": e,
+                    "ax": 0,
+                    "ay": 0,
+                    "az": -1,
+                    "duration_ms": int(duration * 1000) if duration else 500
+                }
+
+                if should_send:
+                    sent_data = payload
+                    data = {
+                        "axis": axis,
+                        "blossom_data": {
+                            "calc_data": {"x": x, "y": y, "z": z, "h": h},
+                            "sent_data": sent_data
+                        },
+                        "height": height,
+                        "fps": fps
+                    }
+                else:
+                    data = {
+                        "axis": axis,
+                        "height": height,
+                        "fps": fps
+                    }
+
+                self.visualization.update(frame_display, None, None, data)  # face/pose_results não usados
+                self.visualization.add_overlay()
+                cv2.imshow(self.cam_view_title, frame_display)
+                if cv2.waitKey(1) & 0xFF == 27:
+                    print("[Main] ESC pressed")
+                    self.running = False
+                    break
+                try:
+                    if cv2.getWindowProperty(self.cam_view_title, cv2.WND_PROP_VISIBLE) < 1:
+                        print("[Main] Window Closed")
+                        break
+                except cv2.error:
+                    break
+                # Optional logging
+                self.logger.log(data)
+
+                if should_send:
+                    try:
+                        blossom_sender.send(payload)
+                    except Exception as e:
+                        print("Error sending to Blossom:", e)
+
+        except KeyboardInterrupt:
+            print("[INFO] Ctrl+C detected.")
+            self.running = False
+
+        finally:
+            print("[INFO] Shutting down...")
+            capture_thread.stop()
+            capture_thread.join()
+            blossom_sender.stop()
+            blossom_sender.join()
+            recorder_thread.stop()
+            recorder_thread.join()
+            mp_thread.stop()
+            mp_thread.join()
+            self.recorder.stop_recording()
+            self.logger.save_log()
+            cv2.destroyAllWindows()
+
+    @staticmethod
+    def compact_timestamp() -> str:
+        now = datetime.now()
+        return now.strftime("%Y%m%d%H%M%S") + f"{int(now.microsecond / 1000):03d}"
+
+
+if __name__ == "__main__":
+    mimetic = Mimetic(
+        output_folder="tests",
+        study_id=1,
+        host="localhost",
+        port=8000,
+        mirror_video=True
+    )
+    mimetic.main()

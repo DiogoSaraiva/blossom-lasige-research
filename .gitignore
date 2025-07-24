@@ -365,4 +365,6 @@ $RECYCLE.BIN/
 
 .python-version
 .bak
-recording_*
+*_recording.mp4
+*_log.json
+*.bak.*

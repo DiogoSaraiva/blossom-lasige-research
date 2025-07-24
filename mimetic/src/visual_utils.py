@@ -4,7 +4,7 @@ import mediapipe as mp
 mp_drawing = mp.solutions.drawing_utils
 
 class Visualization:
-    def __init__(self, frame=None, mesh_results=None, pose_results=None, info=None):
+    def __init__(self, frame=None, mesh_results=None, pose_results=None):
         self.frame = frame
         self.mesh_results = mesh_results
         self.pose_results = pose_results
@@ -15,16 +15,17 @@ class Visualization:
         self.sent_data = {'x': 0.0, 'y': 0.0, 'z': 0.0, 'h': 0.0}
 
 
-    def update(self, frame, mesh_results, pose_results, info):
+    def update(self, frame, mesh_results, pose_results, data):
         self.frame = frame
         self.mesh_results = mesh_results
         self.pose_results = pose_results
-        self.axis = info['axis']  # [pitch, roll, yaw]
-        self.height = info['height']
-        self.fps = info['fps']
-        blossom_data = info['blossom_data']
-        self.calc_data = blossom_data['calc_data']
-        self.sent_data = blossom_data['sent_data']
+        self.axis = data['axis']  # [pitch, roll, yaw]
+        self.height = data['height']
+        self.fps = data['fps']
+        if "blossom_data" in data:
+            blossom_data = data['blossom_data']
+            self.calc_data = blossom_data['calc_data']
+            self.sent_data = blossom_data['sent_data']
 
     def draw_landmarks(self):
         if self.mesh_results.face_landmarks:
@@ -93,7 +94,7 @@ class Visualization:
             x = w - size[0] - 10
             y = h - (len(lines) - i) * line_height - 10
             cv2.putText(self.frame, text, (x, y), font, scale, color, thickness)
-    def render(self):
+    def add_overlay(self):
         """Draw all overlays on the current frame."""
         self.draw_overlay_data()
         self.draw_sent_data()
