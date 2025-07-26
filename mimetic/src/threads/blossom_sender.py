@@ -3,11 +3,13 @@ import time
 import requests
 from queue import Queue, Empty, Full
 
+from mimetic.src.logging_utils import Logger
+
 
 class BlossomSenderThread(threading.Thread):
-    def __init__(self, host="localhost", port=8000, max_queue=32, min_interval=0.1, logger=None):
+    def __init__(self, host="localhost", port: int=8000, max_queue:int=32, min_interval:float=0.1, logger:Logger=None):
         super().__init__()
-        self.logger = logger or print
+        self.logger = logger
         self.queue = Queue(maxsize=max_queue)
         self.running = True
         self.host = host
@@ -16,7 +18,14 @@ class BlossomSenderThread(threading.Thread):
         self.last_send_time = 0
 
     def run(self):
-        self.logger("[BlossomSender] Thread started")
+        """
+        Run the thread to send data to the Blossom server.
+        This method continuously checks the queue for new payloads and sends them to the server.
+        It respects the minimum interval between sending to avoid overwhelming the server.
+        If the queue is empty, it will wait briefly before checking again.
+        If an error occurs during sending, it logs the error.
+        """
+        self.logger("[BlossomSender] Thread started", level="info")
         try:
             while self.running:
                 try:
@@ -37,18 +46,30 @@ class BlossomSenderThread(threading.Thread):
                             f"Sent -> Pitch: {x:.3f}, Roll: {y:.3f}, Yaw: {z:.3f}, Height: {h:.3f}, Duration: {duration:.2f}s")
                         self.last_send_time = time.time()
                     except requests.RequestException as e:
-                        self.logger(f"[BlossomSender] Error sending: {e}")
+                        self.logger(f"[BlossomSender] Error sending: {e}", level="error")
                 except Empty:
                     continue
         except Exception as e:
-            self.logger(f"[BlossomSenderThread] CRASHED: {e}")
-        self.logger("[BlossomSender] Thread stopped")
+            self.logger(f"[BlossomSenderThread] CRASHED: {e}", level="critical")
+        self.logger("[BlossomSender] Thread stopped", level="info")
 
     def send(self, payload: dict):
+        """
+        Send a payload to the Blossom server if the queue is not full.
+        :param payload: Dictionary containing the data to send.
+        :type payload: dict
+
+        """
         if not self.queue.full():
             self.queue.put_nowait(payload)
+        else:
+            self.logger("[BlossomSender] Queue is full, dropping payload", level="warning")
 
     def stop(self):
+        """
+        Stop the thread and clear the queue.
+        """
+
         self.running = False
         try:
             self.queue.put_nowait(None)  # unblock queue.get()

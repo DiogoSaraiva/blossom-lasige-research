@@ -1,8 +1,6 @@
 import time
 from datetime import datetime
-
 import cv2
-from pypot.utils.appdirs import system
 
 from mimetic.src.motion_limiter import MotionLimiter
 from mimetic.src.stream_buffer import ResultBuffer
@@ -11,25 +9,26 @@ from mimetic.src.threads.blossom_sender import BlossomSenderThread
 from mimetic.src.threads.frame_capture import FrameCaptureThread
 from mimetic.src.threads.mediapipe_thread import MediaPipeThread
 from mimetic.src.visual_utils import Visualization
-from src.logging_utils import Logger
-from src.recording_tools import Recorder
+from mimetic.src.logging_utils import Logger, print_logger
+from mimetic.src.recording_tools import Recorder
 
 
 class Mimetic:
-    def __init__(self, output_folder: str, study_id: str or int, host: str, port: int, mirror_video: bool = True, debug_mode=False):
+    def __init__(self, output_folder: str, study_id: str or int, host: str, port: int, mirror_video: bool = True,
+                 print_to_terminal: bool = True):
         study_timestamp = self.compact_timestamp()
         self.study_id = study_id or study_timestamp
         self.host = host
         self.port = port
         self.mirror_video = mirror_video
-        self.debug_mode = debug_mode
+        self.debug_mode = print_to_terminal
         self.pose_logger = Logger(f"{output_folder}/{self.study_id}/pose_log.json", mode="pose")
-        self.system_logger = Logger(f"{output_folder}/{self.study_id}/system_log.json", mode="system") if not debug_mode else print
-        self.recorder = Recorder(f"{output_folder}/{self.study_id}/recording.mp4")
+        self.system_logger = Logger(f"{output_folder}/{self.study_id}/system_log.json", mode="system") if (
+                    print_to_terminal == False) else print_logger
+        self.recorder = Recorder(f"{output_folder}/{self.study_id}/recording.mp4", logger=self.system_logger)
         self.limiter = MotionLimiter()
         self.visualization = Visualization()
         self.buffer = ResultBuffer()
-
         self.cam_view_title = "Pose Estimation " + " (Mirrored)" if mirror_video else ""
         self.running = True
 
@@ -49,15 +48,17 @@ class Mimetic:
         else:
             raise RuntimeError("Failed to capture initial frame within timeout.")
 
-        height, width = frame_display.shape[:2]
-        self.system_logger(f"[INFO] Detected resolution: {width}x{height}")
+        frame_height, frame_width = frame_display.shape[:2]
+        self.system_logger(f"[INFO] Detected resolution: {frame_width}x{frame_height}")
         blossom_sender_thread = BlossomSenderThread(host=self.host, port=self.port, logger=self.system_logger)
-        mp_thread = MediaPipeThread(result_buffer=self.buffer,logger=self.system_logger)
+        mp_thread = MediaPipeThread(result_buffer=self.buffer, logger=self.system_logger)
 
         blossom_sender_thread.start()
         mp_thread.start()
 
-        recorder_thread = AutonomousRecorderThread(self.recorder, capture_thread, resolution=(width, height), fps=30, mirror=self.mirror_video, logger=self.system_logger)
+        recorder_thread = AutonomousRecorderThread(self.recorder, capture_thread,
+                                                   resolution=(frame_width, frame_height), fps=30,
+                                                   mirror=self.mirror_video, logger=self.system_logger)
         recorder_thread.start()
 
         last_pose_data = None
@@ -70,10 +71,11 @@ class Mimetic:
 
                 # Full resolution for display/recording
                 if frame_display is not None:
-                    height, width = frame_display.shape[:2]
+                    frame_height, frame_width = frame_display.shape[:2]
 
                 # Reduced resolution for MediaPipe
-                frame_mp = capture_thread.get_frame(mirror_video=self.mirror_video,  width=min(320, width), height=min(180, height))
+                frame_mp = capture_thread.get_frame(mirror_video=self.mirror_video, width=min(320, frame_width),
+                                                    height=min(180, frame_height))
                 if frame_mp is None:
                     continue
                 mp_thread.send(frame_mp)
@@ -125,7 +127,6 @@ class Mimetic:
                 if should_send:
                     data['data_sent'] = True
 
-
                 self.visualization.update(frame_display, None, None, data)  # face/pose_results não usados
                 self.visualization.add_overlay()
                 cv2.imshow(self.cam_view_title, frame_display)
@@ -174,13 +175,36 @@ class Mimetic:
         return now.strftime("%Y%m%d-%H%M%S") + f"{int(now.microsecond / 1000):03d}"
 
 
+import argparse
+
+
+def parse_args():
+    """
+    Parses command line arguments for the Mimetic application.
+    :return: Parsed arguments as a Namespace object.
+    :rtype: argparse.Namespace
+    """
+    parser = argparse.ArgumentParser(description="Mimetic Pose Estimation and Recording Tool")
+    parser.add_argument("--output_folder", type=str, default="recordings", help="Folder to save recordings")
+    parser.add_argument("--study_id", type=str, default=None, help="Study ID for the recording")
+    parser.add_argument("--host", type=str, default="localhost", help="Blossom server host")
+    parser.add_argument("--port", type=int, default=8000, help="Blossom server port")
+    parser.add_argument("--mirror_video", type=str, default="true", help="Mirror video (true/false)")
+    parser.add_argument("--print_to_terminal", type=str, default="true", help="Print logs to terminal (true/false)")
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
+    args = parse_args()
     mimetic = Mimetic(
-        output_folder="recordings",
-        study_id=Mimetic.compact_timestamp(),
-        host="localhost",
-        port=8000,
-        mirror_video=True,
-        debug_mode = False
+        output_folder=args.output_folder,
+        study_id=args.study_id,
+        host=args.host,
+        port=args.port,
+        mirror_video=(args.mirror_video.lower() == "true"),
+        print_to_terminal=(args.print_to_terminal.lower() == "false")
     )
     mimetic.main()
+    print("[Mimetic] Application finished.")
+    print("[Mimetic] All threads stopped and resources released.")
+    print("[Mimetic] Data saved to:", f"{args.output_folder}/{mimetic.study_id}/")

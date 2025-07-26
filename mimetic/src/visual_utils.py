@@ -1,10 +1,21 @@
 import cv2
 import mediapipe as mp
+import numpy as np
+
+from mimetic.src.logging_utils import Logger
 
 mp_drawing = mp.solutions.drawing_utils
 
 class Visualization:
-    def __init__(self, frame=None, mesh_results=None, pose_results=None):
+    def __init__(self, frame: np.ndarray=None, mesh_results=None, pose_results=None, logger: Logger=None):
+        """
+        Initializes the Visualization class with a frame, mesh results, pose results, and a logger.
+        :param frame: The current video frame to visualize.
+        :type frame: np.ndarray
+        :param mesh_results: Results from the face mesh model.
+        :type mesh_results: mediapipe.framework.formats.landmark_pb2.NormalizedLand
+        """
+        self.logger = logger
         self.frame = frame
         self.mesh_results = mesh_results
         self.pose_results = pose_results
@@ -14,7 +25,18 @@ class Visualization:
         self.fps = None
         self.blossom_data = None
 
-    def update(self, frame, mesh_results, pose_results, data):
+    def update(self, frame: np.ndarray, mesh_results, pose_results, data: dict):
+        """
+        Updates the visualization with a new frame, mesh results, pose results, and additional data.
+        :param frame: The current video frame to visualize.
+        :type frame: np.ndarray
+        :param mesh_results: Results from the face mesh model.
+        :type mesh_results: mediapipe.framework.formats.landmark_pb2.NormalizedLand
+        :param pose_results: Results from the pose model.
+        :type pose_results: mediapipe.framework.formats.landmark_pb2.NormalizedLand
+        :param data: Additional data containing axis, height, fps, data_sent, and blossom
+        :type data: dict
+        """
         self.frame = frame
         self.mesh_results = mesh_results
         self.pose_results = pose_results
@@ -25,6 +47,13 @@ class Visualization:
         self.blossom_data = data['blossom_data']
 
     def draw_landmarks(self):
+        """
+        Draws face and pose landmarks on the current frame.
+        This method draws circles on the frame for each landmark detected in the face mesh and pose results.
+        It uses the coordinates of the landmarks to position the circles on the frame.
+        The face landmarks are drawn in green and the pose landmarks in blue.
+        """
+        # Face landmarks
         if self.mesh_results.face_landmarks:
             for landmark in self.mesh_results.face_landmarks[0]:
                 x = int(landmark.x * self.frame.shape[1])
@@ -39,9 +68,15 @@ class Visualization:
                 cv2.circle(self.frame, (x, y), 2, (255, 0, 0), -1)
 
     def draw_shoulder_line(self):
+        """
+        Draws a line between the left and right shoulders on the current frame.
+        This method checks if the pose landmarks are available and draws a line connecting the left and right
+        shoulders. The line is drawn in white and is useful for visualizing the shoulder alignment.
+        It uses the coordinates of the left and right shoulder landmarks to determine the endpoints of the line.
+        """
         if self.pose_results.pose_landmarks:
             lm = self.pose_results.pose_landmarks[0]
-            if len(lm) > 12:  # até aos ombros
+            if len(lm) > 12:
                 h, w = self.frame.shape[:2]
                 left = lm[11]
                 right = lm[12]
@@ -50,6 +85,13 @@ class Visualization:
                 cv2.line(self.frame, (x1, y1), (x2, y2), (255, 255, 255), 1)
 
     def draw_overlay_data(self):
+        """
+        Draws overlay data such as pitch, roll, yaw, height, and FPS on the current frame.
+        This method displays the current pitch, roll, yaw, and height values on the frame.
+        It uses OpenCV's putText function to render the text on the frame at specified offsets.
+        The text is displayed in green color and uses a specific font size and thickness for visibility.
+        The FPS (frames per second) is also displayed if available, positioned at the top right corner of the frame.
+        """
         h, w = self.frame.shape[:2]
         x_offset = 10
         y_offset = 30
@@ -74,6 +116,15 @@ class Visualization:
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
     def draw_blossom_data(self):
+        """
+        Draws the calculated blossom data on the current frame.
+        This method displays the calculated values for pitch, roll, yaw, and height in a formatted string.
+        It uses OpenCV's putText function to render the text on the frame at specified offsets.
+        The text is displayed in yellow color and uses a specific font size and thickness for visibility.
+        Additionally, it indicates whether the data has been sent with a simple checkbox-like representation.
+        The text is positioned at the bottom right corner of the frame, with a line height for
+        clear separation between multiple lines of text.
+        """
         h, w = self.frame.shape[:2]
         font = cv2.FONT_HERSHEY_SIMPLEX
         scale = 0.5
@@ -92,7 +143,10 @@ class Visualization:
             y = h - (len(lines) - i) * line_height - 10
             cv2.putText(self.frame, text, (x, y), font, scale, color, thickness)
     def add_overlay(self):
-        """Draw all overlays on the current frame."""
+        """
+        Draw all overlays on the current frame.
+        This method calls other methods to draw the overlay data, blossom data, landmarks, and shoulder line.
+        """
         self.draw_overlay_data()
         self.draw_blossom_data()
         #  self.draw_landmarks()
