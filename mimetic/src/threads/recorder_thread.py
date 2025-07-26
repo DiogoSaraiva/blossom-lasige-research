@@ -1,51 +1,36 @@
 import threading
-from queue import Queue, Empty
+import time
 
-
-class RecorderThread(threading.Thread):
-    def __init__(self, recorder, resolution, max_queue=32):
+class AutonomousRecorderThread(threading.Thread):
+    def __init__(self, recorder, capture_thread, resolution=(1280, 720), fps=30, mirror=True, logger=None):
         super().__init__()
-        self.queue = Queue(maxsize=max_queue)
-        self.running = True
+        self.logger = logger or print
         self.recorder = recorder
+        self.capture_thread = capture_thread
         self.resolution = resolution
+        self.fps = fps
+        self.mirror = mirror
+        self.running = True
 
     def run(self):
-        print("[RecorderThread] Thread started")
-        try:
-            self.recorder.start_recording(frame_size=self.resolution)
+        self.logger("[AutonomousRecorder] Started")
+        self.recorder.start_recording(frame_size=self.resolution)
+        delay = 1.0 / self.fps
+        next_frame_time = time.time()
 
-            while self.running:
-                try:
-                    frame = self.queue.get(timeout=0.1)
-                except Empty:
-                    continue
+        while self.running:
+            now = time.time()
+            if now < next_frame_time:
+                time.sleep(next_frame_time - now)
+            else:
+                next_frame_time += delay
+                frame = self.capture_thread.get_frame(mirror_video=self.mirror)
+                if frame is not None and frame.size > 0:
+                    self.recorder.write_frame(frame)
 
-                if frame is None or frame.size == 0:
-                    continue
-
-                self.recorder.write_frame(frame)
-
-        except Exception as e:
-            print(f"[RecorderThread] CRASHED: {e}")
-            import traceback
-            traceback.print_exc()
-        finally:
-            self.recorder.stop_recording()
-            print("[RecorderThread] Thread stopped")
-
-    def record(self, frame):
-        if self.queue.full():
-            return
-        if frame is not None and frame.size > 0:
-            try:
-                self.queue.put_nowait(frame)
-            except Exception as e:
-                print(f"[RecorderThread] CRASHED: {e}")
-                import traceback
-                traceback.print_exc()
+        self.recorder.stop_recording()
+        self.logger("[AutonomousRecorder] Stopped")
 
     def stop(self):
         self.running = False
-        with self.queue.mutex:
-            self.queue.queue.clear()
+        self.recorder.stop_recording()

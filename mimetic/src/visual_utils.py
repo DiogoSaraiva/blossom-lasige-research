@@ -9,11 +9,10 @@ class Visualization:
         self.mesh_results = mesh_results
         self.pose_results = pose_results
         self.axis = {'pitch': 0.0, 'roll': 0.0, 'yaw': 0.0}
+        self.data_sent = None
         self.height = 0.0
         self.fps = None
-        self.calc_data = {'x': 0.0, 'y': 0.0, 'z': 0.0, 'h': 0.0}
-        self.sent_data = {'x': 0.0, 'y': 0.0, 'z': 0.0, 'h': 0.0}
-
+        self.blossom_data = None
 
     def update(self, frame, mesh_results, pose_results, data):
         self.frame = frame
@@ -22,10 +21,8 @@ class Visualization:
         self.axis = data['axis']  # [pitch, roll, yaw]
         self.height = data['height']
         self.fps = data['fps']
-        if "blossom_data" in data:
-            blossom_data = data['blossom_data']
-            self.calc_data = blossom_data['calc_data']
-            self.sent_data = blossom_data['sent_data']
+        self.data_sent = data['data_sent']
+        self.blossom_data = data['blossom_data']
 
     def draw_landmarks(self):
         if self.mesh_results.face_landmarks:
@@ -76,7 +73,7 @@ class Visualization:
             cv2.putText(self.frame, fps_text, (x_fps, y_fps),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-    def draw_sent_data(self):
+    def draw_blossom_data(self):
         h, w = self.frame.shape[:2]
         font = cv2.FONT_HERSHEY_SIMPLEX
         scale = 0.5
@@ -85,8 +82,8 @@ class Visualization:
         line_height = 20
 
         lines = [
-            f"Calculated: P={self.calc_data['x']:.3f}, R={self.calc_data['y']:.3f}, Y={self.calc_data['z']:.3f}, H={self.calc_data['h']:.3f}",
-            f"Sent:       P={self.sent_data['x']:.3f}, R={self.sent_data['y']:.3f}, Y={self.sent_data['z']:.3f}, H={self.sent_data['h']:.3f}"
+            f"Calculated: P={self.blossom_data['x']:.3f}, R={self.blossom_data['y']:.3f}, Y={self.blossom_data['z']:.3f}, H={self.blossom_data['h']:.3f}",
+            f"Sent:      [{'X' if self.data_sent else ' '}]"
         ]
 
         for i, text in enumerate(lines):
@@ -97,6 +94,6 @@ class Visualization:
     def add_overlay(self):
         """Draw all overlays on the current frame."""
         self.draw_overlay_data()
-        self.draw_sent_data()
+        self.draw_blossom_data()
         #  self.draw_landmarks()
         # self.draw_shoulder_line()

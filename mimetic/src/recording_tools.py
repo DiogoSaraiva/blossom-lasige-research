@@ -21,20 +21,27 @@ class Recorder:
         else:
             raise ValueError("Expected a boolean value (true/false)")
 
-    def start_recording(self, frame_size = (1280, 720)):
-        fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v') # type: ignore[attr-defined]
-        self.video_writer = cv2.VideoWriter(self.output_path, fourcc, self.fps, frame_size)
-        if self.video_writer.isOpened():
+    def start_recording(self, frame_size=(1280, 720)):
+        Path(self.output_path).parent.mkdir(parents=True, exist_ok=True)
+        try:
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v') # type: ignore[attr-defined]
+            temp_writer = cv2.VideoWriter(self.output_path, fourcc, self.fps, frame_size)
+            if not temp_writer.isOpened():
+                temp_writer.release()
+                raise IOError(f"cv2.VideoWriter failed to open file: {self.output_path}")
+            self.video_writer = temp_writer
             print(f"[INFO] Recording enabled. Saving to: {self.output_path}")
-        else:
-            print("[ERROR] Failed to open video writer.")
+        except Exception as e:
+            self.video_writer = None
+            print(f"[ERROR] Failed to open video writer: {e}")
+            import traceback
+            traceback.print_exc()
 
     def write_frame(self, frame):
         if self.video_writer:
             self.video_writer.write(frame)
 
     def stop_recording(self):
-        Path(self.output_path).parent.mkdir(parents=True, exist_ok=True)
         if self.video_writer:
             self.video_writer.release()
             print(f"[INFO] Recording saved to: {self.output_path}")

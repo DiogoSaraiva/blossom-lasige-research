@@ -368,3 +368,4 @@ $RECYCLE.BIN/
 *_recording.mp4
 *_log.json
 *.bak.*
+*/recordings/*

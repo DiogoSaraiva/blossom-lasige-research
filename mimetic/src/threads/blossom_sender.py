@@ -1,11 +1,13 @@
 import threading
 import time
 import requests
-from queue import Queue, Empty
+from queue import Queue, Empty, Full
+
 
 class BlossomSenderThread(threading.Thread):
-    def __init__(self, host="localhost", port=8000, max_queue=32, min_interval=0.1):
+    def __init__(self, host="localhost", port=8000, max_queue=32, min_interval=0.1, logger=None):
         super().__init__()
+        self.logger = logger or print
         self.queue = Queue(maxsize=max_queue)
         self.running = True
         self.host = host
@@ -14,11 +16,13 @@ class BlossomSenderThread(threading.Thread):
         self.last_send_time = 0
 
     def run(self):
-        print("[BlossomSender] Thread started")
+        self.logger("[BlossomSender] Thread started")
         try:
             while self.running:
                 try:
                     payload = self.queue.get(timeout=0.1)
+                    if payload is None:
+                        break
                     now = time.time()
                     if now - self.last_send_time < self.min_interval:
                         time.sleep(self.min_interval - (now - self.last_send_time))
@@ -29,16 +33,16 @@ class BlossomSenderThread(threading.Thread):
                         z = payload.get("z", 0)
                         h = payload.get("h", 0)
                         duration = payload.get("duration_ms", 0) / 1000
-                        print(
+                        self.logger(
                             f"Sent -> Pitch: {x:.3f}, Roll: {y:.3f}, Yaw: {z:.3f}, Height: {h:.3f}, Duration: {duration:.2f}s")
                         self.last_send_time = time.time()
                     except requests.RequestException as e:
-                        print(f"[BlossomSender] Error sending: {e}")
+                        self.logger(f"[BlossomSender] Error sending: {e}")
                 except Empty:
                     continue
         except Exception as e:
-            print(f"[BlossomSenderThread] CRASHED: {e}")
-        print("[BlossomSender] Thread stopped")
+            self.logger(f"[BlossomSenderThread] CRASHED: {e}")
+        self.logger("[BlossomSender] Thread stopped")
 
     def send(self, payload: dict):
         if not self.queue.full():
@@ -46,5 +50,9 @@ class BlossomSenderThread(threading.Thread):
 
     def stop(self):
         self.running = False
+        try:
+            self.queue.put_nowait(None)  # unblock queue.get()
+        except Full:
+            pass
         with self.queue.mutex:
             self.queue.queue.clear()

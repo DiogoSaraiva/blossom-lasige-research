@@ -4,6 +4,7 @@ from queue import Queue, Empty
 
 import cv2
 import mediapipe as mp
+import numpy as np
 from mediapipe.tasks.python import BaseOptions, vision
 from mediapipe.tasks.python.vision import (
     FaceLandmarkerOptions, PoseLandmarkerOptions,
@@ -14,12 +15,12 @@ from mimetic.src.pose_utils import PoseUtils
 
 
 class MediaPipeThread(threading.Thread):
-    def __init__(self, result_buffer, model_dir=None, max_queue=8):
+    def __init__(self, result_buffer, model_dir=None, max_queue=8, logger=None):
         super().__init__()
+        self.logger = logger or print
         self.queue = Queue(maxsize=max_queue)
         self.result_buffer = result_buffer
         self.running = True
-
         self.latest_face = None
         self.latest_pose = None
         self.last_timestamp = 0
@@ -53,25 +54,37 @@ class MediaPipeThread(threading.Thread):
         self.pose_landmarker = vision.PoseLandmarker.create_from_options(pose_options)
 
     def run(self):
-        print("[MediaPipe] Thread started")
+        self.logger("[MediaPipe] Thread started")
         try:
             while self.running:
                 try:
-                    frame, timestamp = self.queue.get(timeout=0.1)
-                    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame)
-                    self.face_landmarker.detect_async(mp_image, timestamp)
-                    self.pose_landmarker.detect_async(mp_image, timestamp)
+                    item = self.queue.get(timeout=0.1)
+                    if item is None or not isinstance(item, tuple) or len(item) != 2:
+                        continue
+                    frame, timestamp = item
+                    if not isinstance(frame, (np.ndarray,)):
+                        self.logger("[MediaPipe] Invalid frame")
+                        continue
+
+                    try:
+                        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame)
+                        self.face_landmarker.detect_async(mp_image, timestamp)
+                        self.pose_landmarker.detect_async(mp_image, timestamp)
+                    except Exception as e:
+                        self.logger(f"[MediaPipe] Error during detect_async: {e}")
+                        import traceback
+                        traceback.print_exc()
                 except Empty:
                     continue
         except Exception as e:
-            print(f"[MediaPipe] CRASHED: {e}")
+            self.logger(f"[MediaPipe] CRASHED: {e}")
             import traceback
             traceback.print_exc()
-        print("[MediaPipe] Thread stopped")
+        self.logger("[MediaPipe] Thread stopped")
 
     def send(self, frame):
         if self.queue.full():
-            print("[DEBUG] MediaPipe queue full")
+            self.logger("[DEBUG] MediaPipe queue full")
         if not self.queue.full():
             timestamp = int(cv2.getTickCount() / cv2.getTickFrequency() * 1000)
             if timestamp <= self.last_timestamp:

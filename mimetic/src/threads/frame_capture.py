@@ -2,17 +2,18 @@ import threading
 import cv2
 
 class FrameCaptureThread(threading.Thread):
-    def __init__(self, cam_index=0):
+    def __init__(self, cam_index=0, logger=None):
         super().__init__()
-        self.cap = cv2.VideoCapture(0)
+        self.logger = logger or print
+        self.cap = cv2.VideoCapture(cam_index)
         if not self.cap.isOpened():
-            print("[ERROR] Camera failed to open.")
+            self.logger("[ERROR] Camera failed to open.")
         self.running = True
         self.latest_frame = None
         self.lock = threading.Lock()
 
     def run(self):
-        print("[FrameCaptureThread] Thread started")
+        self.logger("[FrameCaptureThread] Thread started")
         try:
             while self.running and self.cap.isOpened():
                 ret, frame = self.cap.read()
@@ -21,7 +22,7 @@ class FrameCaptureThread(threading.Thread):
                         self.latest_frame = frame
             self.cap.release()
         except Exception as e:
-            print(f"[FrameCaptureThread] CRASHED: {e}")
+            self.logger(f"[FrameCaptureThread] CRASHED: {e}")
             import traceback
             traceback.print_exc()
 

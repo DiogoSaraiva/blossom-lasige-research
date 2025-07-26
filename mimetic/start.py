@@ -2,10 +2,11 @@ import time
 from datetime import datetime
 
 import cv2
+from pypot.utils.appdirs import system
 
 from mimetic.src.motion_limiter import MotionLimiter
 from mimetic.src.stream_buffer import ResultBuffer
-from mimetic.src.threads.AutonomousRecorderThread import AutonomousRecorderThread
+from mimetic.src.threads.recorder_thread import AutonomousRecorderThread
 from mimetic.src.threads.blossom_sender import BlossomSenderThread
 from mimetic.src.threads.frame_capture import FrameCaptureThread
 from mimetic.src.threads.mediapipe_thread import MediaPipeThread
@@ -15,15 +16,16 @@ from src.recording_tools import Recorder
 
 
 class Mimetic:
-    def __init__(self, output_folder: str, study_id: str or int, host: str, port: int, mirror_video: bool = True):
+    def __init__(self, output_folder: str, study_id: str or int, host: str, port: int, mirror_video: bool = True, debug_mode=False):
         study_timestamp = self.compact_timestamp()
         self.study_id = study_id or study_timestamp
         self.host = host
         self.port = port
         self.mirror_video = mirror_video
-
-        self.logger = Logger(f"{output_folder}/{self.study_id}_log.json")
-        self.recorder = Recorder(f"{output_folder}/{self.study_id}_recording.mp4")
+        self.debug_mode = debug_mode
+        self.pose_logger = Logger(f"{output_folder}/{self.study_id}/pose_log.json", mode="pose")
+        self.system_logger = Logger(f"{output_folder}/{self.study_id}/system_log.json", mode="system") if not debug_mode else print
+        self.recorder = Recorder(f"{output_folder}/{self.study_id}/recording.mp4")
         self.limiter = MotionLimiter()
         self.visualization = Visualization()
         self.buffer = ResultBuffer()
@@ -32,7 +34,7 @@ class Mimetic:
         self.running = True
 
     def main(self):
-        capture_thread = FrameCaptureThread()
+        capture_thread = FrameCaptureThread(logger=self.system_logger)
         capture_thread.start()
 
         timeout_sec = 5
@@ -48,14 +50,14 @@ class Mimetic:
             raise RuntimeError("Failed to capture initial frame within timeout.")
 
         height, width = frame_display.shape[:2]
-        print(f"[INFO] Detected resolution: {width}x{height}")
-        blossom_sender = BlossomSenderThread(host=self.host, port=self.port)
-        mp_thread = MediaPipeThread(result_buffer=self.buffer)
+        self.system_logger(f"[INFO] Detected resolution: {width}x{height}")
+        blossom_sender_thread = BlossomSenderThread(host=self.host, port=self.port, logger=self.system_logger)
+        mp_thread = MediaPipeThread(result_buffer=self.buffer,logger=self.system_logger)
 
-        blossom_sender.start()
+        blossom_sender_thread.start()
         mp_thread.start()
 
-        recorder_thread = AutonomousRecorderThread(self.recorder, capture_thread, resolution=(width, height), fps=30, mirror=self.mirror_video)
+        recorder_thread = AutonomousRecorderThread(self.recorder, capture_thread, resolution=(width, height), fps=30, mirror=self.mirror_video, logger=self.system_logger)
         recorder_thread.start()
 
         last_pose_data = None
@@ -113,77 +115,72 @@ class Mimetic:
                     "az": -1,
                     "duration_ms": int(duration * 1000) if duration else 500
                 }
-
+                data = {
+                    "data_sent": False,
+                    "axis": axis,
+                    "blossom_data": {"x": x, "y": y, "z": z, "h": h},
+                    "height": height,
+                    "fps": fps
+                }
                 if should_send:
-                    sent_data = payload
-                    data = {
-                        "axis": axis,
-                        "blossom_data": {
-                            "calc_data": {"x": x, "y": y, "z": z, "h": h},
-                            "sent_data": sent_data
-                        },
-                        "height": height,
-                        "fps": fps
-                    }
-                else:
-                    data = {
-                        "axis": axis,
-                        "height": height,
-                        "fps": fps
-                    }
+                    data['data_sent'] = True
+
 
                 self.visualization.update(frame_display, None, None, data)  # face/pose_results não usados
                 self.visualization.add_overlay()
                 cv2.imshow(self.cam_view_title, frame_display)
                 if cv2.waitKey(1) & 0xFF == 27:
-                    print("[Main] ESC pressed")
+                    self.system_logger("[Main] ESC pressed")
                     self.running = False
                     break
                 try:
                     if cv2.getWindowProperty(self.cam_view_title, cv2.WND_PROP_VISIBLE) < 1:
-                        print("[Main] Window Closed")
+                        self.system_logger("[Main] Window Closed")
                         break
                 except cv2.error:
                     break
                 # Optional logging
-                self.logger.log(data)
+                self.pose_logger(data)
 
                 if should_send:
                     try:
-                        blossom_sender.send(payload)
+                        blossom_sender_thread.send(payload)
                     except Exception as e:
-                        print("Error sending to Blossom:", e)
+                        self.system_logger(f"Error sending to Blossom: {e}")
 
         except KeyboardInterrupt:
-            print("[INFO] Ctrl+C detected.")
+            self.system_logger("[INFO] Ctrl+C detected.")
             self.running = False
 
         finally:
-            print("[INFO] Shutting down...")
+            self.system_logger("[INFO] Shutting down...")
             capture_thread.stop()
             capture_thread.join()
-            blossom_sender.stop()
-            blossom_sender.join()
+            blossom_sender_thread.stop()
+            blossom_sender_thread.join()
             recorder_thread.stop()
             recorder_thread.join()
             mp_thread.stop()
             mp_thread.join()
             self.recorder.stop_recording()
-            self.logger.save_log()
+            self.pose_logger.save_log()
+            if isinstance(self.system_logger, Logger):
+                self.system_logger.save_log()
             cv2.destroyAllWindows()
 
     @staticmethod
     def compact_timestamp() -> str:
         now = datetime.now()
-        return now.strftime("%Y%m%d%H%M%S") + f"{int(now.microsecond / 1000):03d}"
+        return now.strftime("%Y%m%d-%H%M%S") + f"{int(now.microsecond / 1000):03d}"
 
 
 if __name__ == "__main__":
     mimetic = Mimetic(
-        output_folder="tests",
-        study_id=1,
+        output_folder="recordings",
+        study_id=Mimetic.compact_timestamp(),
         host="localhost",
         port=8000,
-        mirror_video=True
+        mirror_video=True,
+        debug_mode = False
     )
     mimetic.main()
