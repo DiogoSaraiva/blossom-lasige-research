@@ -22,15 +22,24 @@ POSE_LANDMARKS = {
 }
 
 class PoseUtils:
-    def __init__(self, facemesh_landmarks=None, pose_landmarks=None, logger: Logger=None):
+    """
+    Utility class for pose estimation calculations using MediaPipe landmarks.
+
+    Attributes:
+        logger (Logger): Logger instance for logging messages.
+        landmarks (list): List of face mesh landmarks.
+        pose_landmarks (list): List of pose landmarks.
+        mp_pose: Reference to MediaPipe pose solution.
+    """
+
+    def __init__(self, facemesh_landmarks, pose_landmarks, logger:Logger):
         """
         Initializes the PoseUtils class with face mesh and pose landmarks, and a logger.
-        :param facemesh_landmarks: Face mesh landmarks from MediaPipe.
-        :type facemesh_landmarks: list of mediapipe.framework.formats.landmark
-        :param pose_landmarks: Pose landmarks from MediaPipe.
-        :type pose_landmarks: list of mediapipe.framework.formats.landmark
-        :param logger: Logger instance for logging messages (optional).
-        :type logger: Logger
+
+        Args:
+            facemesh_landmarks (list): Face mesh landmarks from MediaPipe.
+            pose_landmarks (list): Pose landmarks from MediaPipe.
+            logger (Logger): Logger instance for logging messages.
         """
         self.logger = logger
         self.landmarks = facemesh_landmarks
@@ -40,19 +49,20 @@ class PoseUtils:
     def update(self, facemesh_landmarks, pose_landmarks):
         """
         Updates the PoseUtils instance with new face mesh and pose landmarks.
-        :param facemesh_landmarks: New face mesh landmarks from MediaPipe.
-        :type facemesh_landmarks: list of mediapipe.framework.formats.landmark
-        :param pose_landmarks: New pose landmarks from MediaPipe.
-        :type pose_landmarks: list of mediapipe.framework.formats.landmark
+
+        Args:
+            facemesh_landmarks (list): New face mesh landmarks from MediaPipe.
+            pose_landmarks (list): New pose landmarks from MediaPipe.
         """
         self.landmarks = facemesh_landmarks
         self.pose_landmarks = pose_landmarks
 
     def calculate_roll(self):
-        """ Calculates the roll angle of the face based on the position of the eyes.
-        The roll angle is determined by the horizontal distance between the left and right eyes.
-        :return: Roll angle in degrees.
-        :rtype: float
+        """
+        Calculates the roll angle of the face based on the position of the eyes.
+
+        Returns:
+            float or None: Roll angle in degrees, or None if landmarks are unavailable.
         """
         if not self.landmarks or len(self.landmarks) < 2:
             self.logger("[PoseUtils] No landmarks available for roll calculation", level='warning')
@@ -65,10 +75,11 @@ class PoseUtils:
         return math.degrees(angle_rad)
 
     def calculate_pitch(self):
-        """ Calculates the pitch angle of the face based on the position of the nose and chin.
-        The pitch angle is determined by the vertical distance between the nose tip and chin.
-        :return: Pitch angle in degrees.
-        :rtype: float
+        """
+        Calculates the pitch angle of the face based on the position of the nose and chin.
+
+        Returns:
+            float or None: Pitch angle in degrees, or None if landmarks are unavailable.
         """
         if not self.landmarks or len(self.landmarks) < 2:
             self.logger("[PoseUtils] No landmarks available for pitch calculation", level='debug')
@@ -81,10 +92,11 @@ class PoseUtils:
         return math.degrees(math.atan2(chin.y - nose.y, chin.z - nose.z))
 
     def calculate_yaw(self):
-        """ Calculates the yaw angle of the face based on the position of the left and right cheeks.
-        The yaw angle is determined by the horizontal distance between the left and right cheeks.
-        :return: Yaw angle in degrees.
-        :rtype: float
+        """
+        Calculates the yaw angle of the face based on the position of the left and right cheeks.
+
+        Returns:
+            float or None: Yaw angle in degrees, or None if landmarks are unavailable.
         """
         if not self.landmarks or len(self.landmarks) < 2:
             self.logger("[PoseUtils] No landmarks available for yaw calculation", level='debug')
@@ -94,10 +106,11 @@ class PoseUtils:
         return math.degrees(math.atan2(right.z - left.z, right.x - left.x))
 
     def estimate_height(self):
-        """ Estimates the height of the person based on the position of the shoulders and head.
-        The height is estimated by calculating the vertical distance between the shoulders and the center of the head.
-        :return: Estimated height as a percentage of a reference height.
-        :rtype: int or None
+        """
+        Estimates the height of the person based on the position of the shoulders and head.
+
+        Returns:
+            int or None: Estimated height as a percentage of a reference height, or None if estimation fails.
         """
         if not self.landmarks or not self.pose_landmarks:
             self.logger("[PoseUtils] No landmarks available for height estimation", level='debug')

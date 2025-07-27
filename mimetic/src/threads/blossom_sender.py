@@ -6,7 +6,28 @@ from queue import Queue, Empty, Full
 from mimetic.src.logging_utils import Logger
 
 class BlossomSenderThread(threading.Thread):
-    def __init__(self, host="localhost", port: int=8000, max_queue:int=32, min_interval:float=0.1, logger:Logger=None):
+    """
+    Thread responsible for sending pose data payloads to a Blossom server via HTTP POST requests.
+    Manages a queue of payloads, rate-limits requests, and provides thread-safe start/stop mechanisms.
+
+    Args:
+        host (str): Blossom server hostname or IP address.
+        port (int): Blossom server port.
+        max_queue (int): Maximum number of payloads to queue.
+        min_interval (float): Minimum interval (in seconds) between sends.
+        logger (Logger, optional): Logger instance for logging events.
+    """
+    def __init__(self, logger:Logger, host="localhost", port: int=8000, max_queue:int=32, min_interval:float=0.1):
+        """
+        Initialize the BlossomSenderThread.
+
+        Args:
+            host (str): Blossom server hostname or IP address.
+            port (int): Blossom server port.
+            max_queue (int): Maximum number of payloads to queue.
+            min_interval (float): Minimum interval (in seconds) between sends.
+            logger (Logger): Logger instance for logging events.
+        """
         super().__init__()
         self.logger = logger
         self.queue = Queue(maxsize=max_queue)
@@ -18,11 +39,10 @@ class BlossomSenderThread(threading.Thread):
 
     def run(self):
         """
-        Run the thread to send data to the Blossom server.
-        This method continuously checks the queue for new payloads and sends them to the server.
-        It respects the minimum interval between sending to avoid overwhelming the server.
-        If the queue is empty, it will wait briefly before checking again.
-        If an error occurs during sending, it logs the error.
+        Main thread loop for sending payloads to the Blossom server.
+
+        Continuously checks the queue for new payloads and sends them to the server,
+        respecting the minimum interval between sends. Handles errors and logs events.
         """
         self.logger("[BlossomSender] Thread started", level="info")
         try:
@@ -55,10 +75,10 @@ class BlossomSenderThread(threading.Thread):
 
     def send(self, payload: dict):
         """
-        Send a payload to the Blossom server if the queue is not full.
-        :param payload: Dictionary containing the data to send.
-        :type payload: dict
+        Queue a payload to be sent to the Blossom server.
 
+        Args:
+            payload (dict): Dictionary containing the data to send.
         """
         if not self.queue.full():
             self.queue.put_nowait(payload)
@@ -68,6 +88,8 @@ class BlossomSenderThread(threading.Thread):
     def stop(self):
         """
         Stop the thread and clear the queue.
+
+        Signals the thread to stop, unblocks the queue, and clears any remaining payloads.
         """
         self.running = False
         try:

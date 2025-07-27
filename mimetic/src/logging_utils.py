@@ -3,20 +3,37 @@ from datetime import datetime
 from pathlib import Path
 
 def print_logger(message, *args, **kwargs):
+    """
+    Prints a log message to the terminal.
+
+    Args:
+        message (str): The message to print.
+        *args: Additional positional arguments.
+        **kwargs: Additional keyword arguments.
+    """
     print(message)
 
 class Logger:
+    """
+    Logger class for saving and printing logs in pose or system mode.
+
+    Attributes:
+        log_level (str): Logging level for system logs.
+        entries (list): List of log entries.
+        output_path (Path): Path to save the log file.
+        print_to_terminal (bool): If True, logs are printed to the terminal.
+        log (callable): Logging function based on mode and output.
+    """
+
     def __init__(self, output_path: str, mode: str="pose", level: str=None, print_to_terminal: bool = False):
         """
         Initializes the Logger.
-        :param output_path: Path to save the log file.
-        :param mode: Logging mode, either "pose" or "system".
-        :param level: Logging level for system logs (default is "info").
-        :param print_to_terminal: If True, logs will be printed to the terminal instead of saving to a file.
-        :type output_path: str
-        :type mode: str
-        :type level: str
-        :type print_to_terminal: bool
+
+        Args:
+            output_path (str): Path to save the log file.
+            mode (str, optional): Logging mode, either "pose" or "system". Default is "pose".
+            level (str, optional): Logging level for system logs. Default is "info".
+            print_to_terminal (bool, optional): If True, logs are printed to the terminal. Default is False.
         """
         self.log_level = level or "info"
         self.entries = []
@@ -35,8 +52,9 @@ class Logger:
     def _log_pose(self, data: dict):
         """
         Logs pose data to the log file.
-        :param data: Pose data to log, must be a dictionary.
-        :type data: dict
+
+        Args:
+            data (dict): Pose data to log.
         """
         if not isinstance(data, dict):
             print("[Logger] Invalid pose log data (must be dict)")
@@ -50,10 +68,10 @@ class Logger:
     def _log_system(self, message: str, level: str="info"):
         """
         Logs system messages to the log file.
-        :param message: Message to log, can be a string or a dictionary.
-        :type message: str or dict
-        :param level: Logging level, one of "debug", "info", "warning", "error", "critical".
-        :type level: str
+
+        Args:
+            message (str or dict): Message to log.
+            level (str, optional): Logging level ("debug", "info", "warning", "error", "critical"). Default is "info".
         """
         levels = {
             "debug": 0,
@@ -73,7 +91,7 @@ class Logger:
     def save_log(self):
         """
         Saves the logged entries to the specified output path in JSON format.
-        If there are no entries, it prints a message indicating that there is no data to save.
+        If there are no entries, prints a message indicating that there is no data to save.
         """
         if not self.entries:
             print(f"[Logger] No data to save for {self.output_path.name}.")
@@ -89,13 +107,10 @@ class Logger:
     def __call__(self, message: str or dict, level: str=None):
         """
         Calls the logger to log a message or data.
-        If print_to_terminal is True, it prints the message to the terminal.
-        If the log is set to system mode, it logs the message with the specified level.
-        If the log is set to pose mode, it logs the data as pose data.
-        :param message: Message or data to log, can be a string or a dictionary.
-        :type message: str or dict
-        :param level: Logging level, one of "debug", "info", "warning", "error", "critical".
-        :type level: str
+
+        Args:
+            message (str or dict): Message or data to log.
+            level (str, optional): Logging level ("debug", "info", "warning", "error", "critical").
         """
         if self.print_to_terminal:
             print_logger(message, level=level)
@@ -105,6 +120,15 @@ class Logger:
             self._log_pose(message)
 
     def set_system_log_level(self, level: str):
+        """
+        Sets the logging level for system logs.
+
+        Args:
+            level (str): Logging level ("debug", "info", "warning", "error", "critical").
+
+        Raises:
+            ValueError: If the provided level is not valid.
+        """
         if level not in ["debug", "info", "warning", "error", "critical"]:
             raise ValueError(f"Invalid logging level: {level}")
         self.log_level = level

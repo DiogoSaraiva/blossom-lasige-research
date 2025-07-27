@@ -8,25 +8,33 @@ from mimetic.src.threads.frame_capture import FrameCaptureThread
 
 class AutonomousRecorderThread(threading.Thread):
     """
-    A thread that autonomously records video frames from a camera using a Recorder instance.
-    It captures frames from a FrameCaptureThread, writes them to the recorder, and maintains a specified frames per second (fps).
-    The thread can be stopped gracefully, and it handles errors during the recording process.
+    Thread that autonomously records video frames from a camera using a Recorder instance.
+
+    This thread captures frames from a FrameCaptureThread, writes them to the recorder,
+    and maintains a specified frames per second (fps). The thread can be stopped gracefully,
+    and it handles errors during the recording process.
+
+    Args:
+        recorder (Recorder): Recorder instance to handle video recording.
+        capture_thread (FrameCaptureThread): Thread to get frames from the camera.
+        resolution (tuple[int, int], optional): Resolution of the video frames (width, height). Default is (1280, 720).
+        fps (int, optional): Frames per second for the video recording. Default is 30.
+        mirror (bool, optional): Whether to mirror the video frames. Default is True.
+        logger (Logger, optional): Logger instance for logging messages.
     """
-    def __init__(self, recorder: Recorder, capture_thread: FrameCaptureThread, resolution: (int, int)=(1280, 720), fps: int=30, mirror: bool=True, logger: Logger=None):
+
+    def __init__(self, recorder: Recorder, capture_thread: FrameCaptureThread, logger: Logger,
+                 resolution: (int, int) = (1280, 720), fps: int = 30, mirror: bool = True):
         """
-        Initializes the AutonomousRecorderThread with a recorder, capture thread, resolution, fps, and mirror settings.
-        :param recorder: Recorder instance to handle video recording.
-        :type recorder: Recorder
-        :param capture_thread: FrameCaptureThread instance to get frames from the camera.
-        :type capture_thread: FrameCaptureThread
-        :param resolution: Tuple specifying the resolution of the video frames (width, height).
-        :type resolution: tuple(int, int)
-        :param fps: Frames per second for the video recording.
-        :type fps: int
-        :param mirror: Boolean indicating whether to mirror the video frames.
-        :type mirror: bool
-        :param logger: Logger instance for logging messages (optional).
-        :type logger: Logger
+        Initializes the AutonomousRecorderThread.
+
+        Args:
+            recorder (Recorder): Recorder instance to handle video recording.
+            capture_thread (FrameCaptureThread): Thread to get frames from the camera.
+            resolution (tuple[int, int], optional): Resolution of the video frames (width, height).
+            fps (int, optional): Frames per second for the video recording.
+            mirror (bool, optional): Whether to mirror the video frames.
+            logger (Logger, optional): Logger instance for logging messages.
         """
         super().__init__()
         self.logger = logger
@@ -40,6 +48,7 @@ class AutonomousRecorderThread(threading.Thread):
     def run(self):
         """
         The main loop of the thread that starts recording video frames.
+
         It continuously retrieves frames from the capture thread, writes them to the recorder, and handles timing
         to maintain the specified frames per second (fps).
         If an error occurs during recording, it logs the error and prints the traceback.

@@ -5,19 +5,21 @@ from mimetic.src.logging_utils import Logger
 
 class FrameCaptureThread(threading.Thread):
     """
-    A thread that captures frames from a camera and provides methods to retrieve the latest frame.
-    This thread continuously reads frames from the camera and stores the latest frame in a thread-safe manner.
-    It can resize and mirror the video frames as needed.
-    :param cam_index: Index of the camera to capture from (default is 0).
-    :type cam_index: int
+    Thread that captures frames from a camera and provides methods to retrieve the latest frame.
+    Continuously reads frames from the camera and stores the latest frame in a thread-safe way.
+    Supports resizing and mirroring of video frames.
+
+    Args:
+        cam_index (int, optional): Index of the camera to capture from. Defaults to 0.
+        logger (Logger, optional): Logger instance for logging messages.
     """
-    def __init__(self, cam_index=0, logger:Logger=None):
+    def __init__(self, logger:Logger, cam_index=0):
         """
         Initializes the FrameCaptureThread with a camera index and a logger.
-        :param cam_index: Index of the camera to capture from (default is 0).
-        :type cam_index: int
-        :param logger: Logger instance for logging messages (optional).
-        :type logger: Logger
+
+        Args:
+            cam_index (int, optional): Index of the camera to capture from. Defaults to 0.
+            logger (Logger): Logger instance for logging messages.
         """
         super().__init__()
 
@@ -39,7 +41,7 @@ class FrameCaptureThread(threading.Thread):
             actual_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             actual_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             if actual_width == width and actual_height == height:
-                self.logger(f"[INFO] Usando resolução máxima suportada: {width}x{height}", level="info")
+                self.logger(f"[INFO] Using max supported resolution: {width}x{height}", level="info")
                 break
         self.running = True
         self.latest_frame = None
@@ -47,9 +49,9 @@ class FrameCaptureThread(threading.Thread):
 
     def run(self):
         """
-        The main loop of the thread that captures frames from the camera.
-        It continuously reads frames from the camera and updates the latest frame.
-        If an error occurs during frame capture, it logs the error and prints the traceback.
+        Main loop of the thread that captures frames from the camera.
+        Continuously reads frames and updates the latest frame.
+        Logs errors and prints traceback if an exception occurs.
         """
         self.logger("[FrameCaptureThread] Thread started")
         try:
@@ -66,18 +68,15 @@ class FrameCaptureThread(threading.Thread):
 
     def get_frame(self, width: int=None, height: int=None, mirror_video: bool=False):
         """
-        Retrieves the latest captured frame.
-        If the frame is not available, it returns None.
-        If width and height are specified, it resizes the frame to those dimensions.
-        If mirror_video is True, it mirrors the frame horizontally.
-        :param width: Desired width of the frame (optional).
-        :type width: int
-        :param height: Desired height of the frame (optional).
-        :type height: int
-        :param mirror_video: Whether to mirror the video frame horizontally (default is False).
-        :type mirror_video: bool
-        :return: The latest frame, resized and/or mirrored as specified, or None if no frame is available.
-        :rtype: numpy.ndarray or None
+        Retrieves the latest captured frame, optionally resizing and/or mirroring it.
+
+        Args:
+            width (int, optional): Desired width of the frame.
+            height (int, optional): Desired height of the frame.
+            mirror_video (bool, optional): Whether to mirror the frame horizontally. Defaults to False.
+
+        Returns:
+            numpy.ndarray or None: The latest frame, processed as specified, or None if unavailable.
         """
         with self.lock:
             if self.latest_frame is None:
@@ -91,7 +90,7 @@ class FrameCaptureThread(threading.Thread):
 
     def stop(self):
         """
-        Stops the frame capture thread and releases the camera.
+        Stops the frame capture thread and releases the camera resource.
         """
         self.running = False
         if self.cap.isOpened():

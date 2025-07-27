@@ -14,8 +14,23 @@ from mimetic.src.recording_tools import Recorder
 
 
 class Mimetic:
+    """
+    Main class for controlling the flow of video capture, processing, visualization, and recording
+    with pose estimation using MediaPipe, as well as sending data to an external server (Blossom).
+
+    Args:
+        output_folder (str): Folder where output files will be saved.
+        study_id (str|int): Identifier for the study or recording.
+        host (str): Blossom server address.
+        port (int): Blossom server port.
+        mirror_video (bool, optional): If True, mirror the video in visualization and recording.
+        print_to_terminal (bool, optional): If True, print logs to terminal; otherwise, save to file.
+    """
     def __init__(self, output_folder: str, study_id: str or int, host: str, port: int, mirror_video: bool = True,
                  print_to_terminal: bool = True):
+        """
+        Initializes the main parts of the Mimetic system.
+        """
         study_timestamp = self.compact_timestamp()
         self.study_id = study_id or study_timestamp
         self.host = host
@@ -25,14 +40,18 @@ class Mimetic:
         self.pose_logger = Logger(f"{output_folder}/{self.study_id}/pose_log.json", mode="pose")
         self.system_logger = Logger(f"{output_folder}/{self.study_id}/system_log.json", mode="system") if (
                     print_to_terminal == False) else print_logger
-        self.recorder = Recorder(f"{output_folder}/{self.study_id}/recording.avi", logger=self.system_logger)
-        self.limiter = MotionLimiter()
-        self.visualization = Visualization()
-        self.buffer = ResultBuffer()
+        self.recorder = Recorder(f"{output_folder}/{self.study_id}/recording.mp4", logger=self.system_logger)
+        self.limiter = MotionLimiter(logger=self.system_logger)
+        self.visualization = Visualization(logger=self.system_logger)
+        self.buffer = ResultBuffer(logger=self.system_logger)
         self.cam_view_title = "Pose Estimation " + " (Mirrored)" if mirror_video else ""
         self.running = True
 
     def main(self):
+        """
+        Main method that runs the loop for capture, processing, visualization, recording, and data sending.
+        Manages threads for capture, MediaPipe processing, recording, and Blossom sending.
+        """
         capture_thread = FrameCaptureThread(logger=self.system_logger)
         capture_thread.start()
 
@@ -40,6 +59,7 @@ class Mimetic:
         interval_sec = 0.01
         max_attempts = int(timeout_sec / interval_sec)
 
+        # Wait until the first valid frame is captured
         for _ in range(max_attempts):
             frame_display = capture_thread.get_frame(mirror_video=True)
             if frame_display is not None and frame_display.size > 0:
@@ -84,13 +104,14 @@ class Mimetic:
                     continue
                 mp_thread.send(frame_mp)
 
-                # Read results
+                # Read results from buffer
                 pose_data, _ = self.buffer.get_latest_pose_data()
                 if pose_data is not None:
                     last_pose_data = pose_data
 
                 if last_pose_data is None:
-                    continue  # wait until for the first pose is available
+                    continue  # wait until the first pose is available
+
                 pitch = last_pose_data["pitch"]
                 roll = last_pose_data["roll"]
                 yaw = last_pose_data["yaw"]
@@ -101,8 +122,9 @@ class Mimetic:
                 prev_time = current_time
 
                 if None in (pitch, roll, yaw, height):
-                    continue
+                    pass
 
+                # Smooth pose values
                 x = self.limiter.smooth('x', pitch)
                 y = self.limiter.smooth('y', roll)
                 z = self.limiter.smooth('z', yaw)
@@ -133,7 +155,8 @@ class Mimetic:
                 if should_send:
                     data['data_sent'] = True
 
-                self.visualization.update(frame_display, None, None, data)  # face/pose_results não usados
+                # Update visualization and overlays
+                self.visualization.update(frame_display, None, None, data)  # face/pose_results not used
                 self.visualization.add_overlay()
                 cv2.imshow(self.cam_view_title, frame_display)
                 if cv2.waitKey(1) & 0xFF == 27:
@@ -146,9 +169,10 @@ class Mimetic:
                         break
                 except cv2.error:
                     break
-                # Optional logging
+                # Optional pose logging
                 self.pose_logger(data)
 
+                # Send data to Blossom if needed
                 if should_send:
                     try:
                         blossom_sender_thread.send(payload)
@@ -164,6 +188,7 @@ class Mimetic:
             self.running = False
 
         finally:
+            # Shutdown and wait for all threads, save logs
             self.system_logger("[Mimetic] Shutting down...", level="info")
             capture_thread.stop()
             capture_thread.join(timeout=2)
@@ -184,6 +209,12 @@ class Mimetic:
 
     @staticmethod
     def compact_timestamp() -> str:
+        """
+        Generates a compact timestamp for use in file/folder names.
+
+        Returns:
+            str: Timestamp in the format YYYYMMDD-HHMMSSmmm
+        """
         now = datetime.now()
         return now.strftime("%Y%m%d-%H%M%S") + f"{int(now.microsecond / 1000):03d}"
 
@@ -194,8 +225,9 @@ import argparse
 def parse_args():
     """
     Parses command line arguments for the Mimetic application.
-    :return: Parsed arguments as a Namespace object.
-    :rtype: argparse.Namespace
+
+    Returns:
+        argparse.Namespace: Parsed arguments as a Namespace object.
     """
     parser = argparse.ArgumentParser(description="Mimetic Pose Estimation and Recording Tool")
     parser.add_argument("--output_folder", type=str, default="recordings", help="Folder to save recordings")
@@ -208,6 +240,7 @@ def parse_args():
 
 
 if __name__ == "__main__":
+    # Main entry point for the Mimetic application.
     args = parse_args()
     mimetic = Mimetic(
         output_folder=args.output_folder,
