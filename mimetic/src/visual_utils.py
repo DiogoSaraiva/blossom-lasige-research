@@ -1,133 +1,161 @@
-import time
-from threading import Lock
+import cv2
+import mediapipe as mp
+import numpy as np
 
 from mimetic.src.logging_utils import Logger
 
+mp_drawing = mp.solutions.drawing_utils
 
-class ResultBuffer:
+class Visualization:
     """
-    Thread-safe buffer for storing and retrieving face and pose detection results.
-
-    This class allows adding results (face or pose data) with timestamps, retrieving complete results
-    when both face and pose data are available for a timestamp, and managing pose data separately.
-    All buffer operations are protected by a lock for thread safety.
+    Class for visualizing face and pose landmarks, overlaying data, and drawing custom graphics on video frames.
 
     Attributes:
         logger (Logger): Logger instance for logging messages.
-        buffer (dict): Stores face and pose results by timestamp.
-        pose_data_buffer (list): Stores tuples of (pose_data, timestamp).
-        lock (Lock): Threading lock for synchronizing access.
+        frame (np.ndarray): Current video frame to visualize.
+        mesh_results: Results from the face mesh model.
+        pose_results: Results from the pose model.
+        axis (dict): Dictionary containing pitch, roll, and yaw values.
+        data_sent: Indicator if data has been sent.
+        height (float): Estimated height value.
+        fps: Frames per second value.
+        blossom_data: Additional calculated data for overlay.
     """
 
-    def __init__(self, logger:Logger):
+    def __init__(self,  logger:Logger, mesh_results=None, pose_results=None):
         """
-        Initializes the ResultBuffer with an optional logger.
+        Initializes the Visualization class with a logger, mesh results, and pose results.
 
         Args:
             logger (Logger): Logger instance for logging messages.
+            mesh_results: Results from the face mesh model (optional).
+            pose_results: Results from the pose model (optional).
         """
         self.logger = logger
-        self.buffer = {}  # face + pose by timestamp
-        self.pose_data_buffer = []  # array de (pose_data, timestamp)
-        self.lock = Lock()
+        self.frame = None
+        self.mesh_results = mesh_results
+        self.pose_results = pose_results
+        self.axis = {'pitch': 0.0, 'roll': 0.0, 'yaw': 0.0}
+        self.data_sent = None
+        self.height = 0.0
+        self.fps = None
+        self.blossom_data = None
 
-    def add(self, kind: str, result: dict, timestamp: int):
+    def update(self, frame: np.ndarray, mesh_results, pose_results, data: dict):
         """
-        Adds a result to the buffer.
+        Updates the visualization with a new frame, mesh results, pose results, and additional data.
 
         Args:
-            kind (str): The type of result, either "face" or "pose_data".
-            result (dict): The result data to add.
-            timestamp (int): The timestamp associated with the result.
-
-        Raises:
-            ValueError: If kind is not "face" or "pose_data".
+            frame (np.ndarray): The current video frame to visualize.
+            mesh_results: Results from the face mesh model.
+            pose_results: Results from the pose model.
+            data (dict): Additional data containing axis, height, fps, data_sent, and blossom_data.
         """
-        try:
-            with self.lock:
-                if kind == "pose_data":
-                    self.pose_data_buffer.append((result, timestamp))
-                    if len(self.pose_data_buffer) > 30:
-                        self.pose_data_buffer = self.pose_data_buffer[-30:]
-                else:
-                    if timestamp not in self.buffer:
-                        self.buffer[timestamp] = {}
-                    self.buffer[timestamp][kind] = result
-        except ValueError as e:
-            self.logger(f"[ResultBuffer] ValueError: {e}", level="error")
-        except TypeError as e:
-            self.logger(f"[ResultBuffer] TypeError: {e}", level="error")
-        except Exception as e:
-            self.logger(f"[ResultBuffer] Unexpected error: {e}", level="error")
-        if kind not in ["face", "pose_data"]:
-            raise ValueError(f"Invalid kind: {kind}. Must be 'face' or 'pose_data'")
+        self.frame = frame
+        self.mesh_results = mesh_results
+        self.pose_results = pose_results
+        self.axis = data['axis']  # [pitch, roll, yaw]
+        self.height = data['height']
+        self.fps = data['fps']
+        self.data_sent = data['data_sent']
+        self.blossom_data = data['blossom_data']
 
-    def get_if_complete(self, timestamp: int):
+    def draw_landmarks(self):
         """
-        Returns the face and pose results if both are present for the given timestamp.
+        Draws face and pose landmarks on the current frame.
 
-        Args:
-            timestamp (int): The timestamp to check in the buffer.
-
-        Returns:
-            tuple: (face_result, pose_result) if both are present, otherwise (None, None).
+        Face landmarks are drawn in green, and pose landmarks are drawn in blue.
         """
-        with self.lock:
-            if timestamp in self.buffer:
-                res = self.buffer[timestamp]
-                if "face" in res and "pose" in res:
-                    del self.buffer[timestamp]
-                    return res["face"], res["pose"]
-            return None, None
+        # Face landmarks
+        if self.mesh_results.face_landmarks:
+            for landmark in self.mesh_results.face_landmarks[0]:
+                x = int(landmark.x * self.frame.shape[1])
+                y = int(landmark.y * self.frame.shape[0])
+                cv2.circle(self.frame, (x, y), 1, (0, 255, 0), -1)
 
-    def get_latest_complete(self, max_delay_ms=200):
+        # Pose landmarks
+        if self.pose_results.pose_landmarks:
+            for landmark in self.pose_results.pose_landmarks[0]:
+                x = int(landmark.x * self.frame.shape[1])
+                y = int(landmark.y * self.frame.shape[0])
+                cv2.circle(self.frame, (x, y), 2, (255, 0, 0), -1)
+
+    def draw_shoulder_line(self):
         """
-        Returns the latest complete face and pose results from the buffer.
+        Draws a line between the left and right shoulders on the current frame.
 
-        Args:
-            max_delay_ms (int, optional): Maximum delay in milliseconds to consider a result complete.
-
-        Returns:
-            tuple: (face_result, pose_result) if available, otherwise (None, None).
-
-        Raises:
-            TypeError: If max_delay_ms is not an integer.
-            ValueError: If max_delay_ms is negative.
+        The line is drawn in white and visualizes shoulder alignment.
         """
-        now = int(time.time() * 1000)
-        with self.lock:
-            for ts in sorted(self.buffer.keys()):
-                if now - ts > max_delay_ms:
-                    del self.buffer[ts]
-                    continue
-                res = self.buffer[ts]
-                if "face" in res and "pose" in res:
-                    del self.buffer[ts]
-                    return res["face"], res["pose"]
-        return None, None
+        if self.pose_results.pose_landmarks:
+            lm = self.pose_results.pose_landmarks[0]
+            if len(lm) > 12:
+                h, w = self.frame.shape[:2]
+                left = lm[11]
+                right = lm[12]
+                x1, y1 = int(left.x * w), int(left.y * h)
+                x2, y2 = int(right.x * w), int(right.y * h)
+                cv2.line(self.frame, (x1, y1), (x2, y2), (255, 255, 255), 1)
 
-    def get_latest_pose_data(self):
+    def draw_overlay_data(self):
         """
-        Returns the latest pose data and its timestamp from the pose data buffer.
+        Draws overlay data such as pitch, roll, yaw, height, and FPS on the current frame.
 
-        Returns:
-            tuple: (pose_data, timestamp) if available, otherwise (None, None).
+        The text is displayed in green for visibility.
         """
-        try:
-            with self.lock:
-                if not self.pose_data_buffer:
-                    return None, None
-                return self.pose_data_buffer[-1]  # last (result, timestamp)
-        except Exception as e:
-            self.logger(f"[ResultBuffer] Error getting latest pose data: {e}", level="error")
-            return None, None
+        h, w = self.frame.shape[:2]
+        x_offset = 10
+        y_offset = 30
 
-    def clear(self):
-        """
-        Clears the buffer and pose data buffer.
+        cv2.putText(self.frame,
+                    f"Pitch: {self.axis['pitch']:+6.2f}  Roll: {self.axis['roll']:+6.2f}  Yaw: {self.axis['yaw']:+6.2f}",
+                    (x_offset, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-        This method removes all entries from both buffers, effectively resetting them.
+        y_offset += 30
+        cv2.putText(self.frame,
+                    f"Height: {self.height:.2f}",
+                    (x_offset, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
+        if self.fps is not None:
+            fps_text = f"{self.fps:.1f} FPS"
+            text_size = cv2.getTextSize(fps_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
+            x_fps = w - text_size[0] - 10
+            y_fps = 30
+            cv2.putText(self.frame, fps_text, (x_fps, y_fps),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
+    def draw_blossom_data(self):
         """
-        with self.lock:
-            self.buffer.clear()
-            self.pose_data_buffer.clear()
+        Draws the calculated blossom data on the current frame.
+
+        The data includes pitch, roll, yaw, height, and a sent status, displayed in yellow.
+        """
+        h, w = self.frame.shape[:2]
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        scale = 0.5
+        color = (0, 255, 255)
+        thickness = 1
+        line_height = 20
+
+        lines = [
+            f"Calculated: P={self.blossom_data['x']:.3f}, R={self.blossom_data['y']:.3f}, Y={self.blossom_data['z']:.3f}, H={self.blossom_data['h']:.3f}",
+            f"Sent:      [{'X' if self.data_sent else ' '}]"
+        ]
+
+        for i, text in enumerate(lines):
+            size = cv2.getTextSize(text, font, scale, thickness)[0]
+            x = w - size[0] - 10
+            y = h - (len(lines) - i) * line_height - 10
+            cv2.putText(self.frame, text, (x, y), font, scale, color, thickness)
+
+    def add_overlay(self):
+        """
+        Draws all overlays on the current frame.
+
+        Calls methods to draw overlay data, blossom data, landmarks, and shoulder line.
+        """
+        self.draw_overlay_data()
+        self.draw_blossom_data()
+        #self.draw_landmarks()
+        #self.draw_shoulder_line()
