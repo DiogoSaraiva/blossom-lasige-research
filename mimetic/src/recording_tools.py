@@ -1,5 +1,9 @@
+from idlelib.configdialog import HelpFrame
+
 import cv2
 from pathlib import Path
+
+from mimetic.src.config import VIDEO_WIDTH, VIDEO_HEIGHT
 
 from mimetic.src.logging_utils import Logger
 
@@ -20,6 +24,7 @@ class Recorder:
         self.video_writer = None
         self.fps = fps
         self.output_path = output_path
+        self.is_recording = False
 
 
     @staticmethod
@@ -43,7 +48,7 @@ class Recorder:
         else:
             raise ValueError("Expected a boolean value (true/false)")
 
-    def start_recording(self, frame_size=(1280, 720)):
+    def start_recording(self, frame_size=(VIDEO_WIDTH, VIDEO_HEIGHT)):
         """
         Starts the video recording by initializing the VideoWriter with the specified frame size.
         Creates the output directory if it does not exist.
@@ -52,18 +57,21 @@ class Recorder:
         """
         Path(self.output_path).parent.mkdir(parents=True, exist_ok=True)
         try:
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v') # type: ignore[attr-defined]
+            fourcc = cv2.VideoWriter_fourcc(*'XVID')
             temp_writer = cv2.VideoWriter(self.output_path, fourcc, self.fps, frame_size)
             if not temp_writer.isOpened():
                 temp_writer.release()
                 raise IOError(f"cv2.VideoWriter failed to open file: {self.output_path}")
             self.video_writer = temp_writer
+            self.is_recording = True
             self.logger(f"[Recorder] Recording enabled. Saving to: {self.output_path}", level='info')
         except Exception as e:
             self.video_writer = None
-            self.logger(f"[ERROR] Failed to open video writer: {e}", level='critical')
+            self.is_recording = False
+            self.logger(f"[Recorder] Failed to open video writer: {e}", level='critical')
             import traceback
             traceback.print_exc()
+
 
     def write_frame(self, frame):
         """
@@ -71,8 +79,11 @@ class Recorder:
         :param frame: The frame to write, should be a valid image array.
         :type frame: numpy.ndarray
         """
-        if self.video_writer:
-            self.video_writer.write(frame)
+        if self.is_recording:
+            if self.video_writer:
+                self.video_writer.write(frame)
+            else:
+                self.logger("[Recorder] VideoWriter is not initialized or recording stopped. Cannot write frame.", level='critical')
 
     def stop_recording(self):
         """
@@ -81,5 +92,6 @@ class Recorder:
         """
         if self.video_writer:
             self.video_writer.release()
-            self.logger(f"[INFO] Recording saved to: {self.output_path}")
+            self.logger(f"[Recorder] Recording saved to: {self.output_path}", level='info')
             self.video_writer = None
+        self.is_recording = False

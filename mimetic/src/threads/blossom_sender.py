@@ -5,7 +5,6 @@ from queue import Queue, Empty, Full
 
 from mimetic.src.logging_utils import Logger
 
-
 class BlossomSenderThread(threading.Thread):
     def __init__(self, host="localhost", port: int=8000, max_queue:int=32, min_interval:float=0.1, logger:Logger=None):
         super().__init__()
@@ -51,7 +50,8 @@ class BlossomSenderThread(threading.Thread):
                     continue
         except Exception as e:
             self.logger(f"[BlossomSenderThread] CRASHED: {e}", level="critical")
-        self.logger("[BlossomSender] Thread stopped", level="info")
+            import traceback
+            traceback.print_exc()
 
     def send(self, payload: dict):
         """
@@ -69,7 +69,6 @@ class BlossomSenderThread(threading.Thread):
         """
         Stop the thread and clear the queue.
         """
-
         self.running = False
         try:
             self.queue.put_nowait(None)  # unblock queue.get()
@@ -77,3 +76,4 @@ class BlossomSenderThread(threading.Thread):
             pass
         with self.queue.mutex:
             self.queue.queue.clear()
+        self.logger("[BlossomSender] Thread stopped", level="info")

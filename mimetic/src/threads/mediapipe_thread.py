@@ -104,7 +104,6 @@ class MediaPipeThread(threading.Thread):
             self.logger(f"[MediaPipe] CRASHED: {e}", level="critical")
             import traceback
             traceback.print_exc()
-        self.logger("[MediaPipe] Thread stopped", level="info")
 
     def send(self, frame: np.ndarray):
         """
@@ -263,4 +262,6 @@ class MediaPipeThread(threading.Thread):
         except Exception as e:
             self.logger(f"[MediaPipe] Error closing MediaPipe models: {e}", level="error")
         self.queue.put(None)  # Ensure the thread can exit if it's waiting on the queue
+        with self.queue.mutex:
+            self.queue.queue.clear()
         self.logger("[MediaPipe] Thread stopped", level="info")

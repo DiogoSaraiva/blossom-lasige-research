@@ -30,7 +30,7 @@ class MotionLimiter:
         :param threshold: The minimum change required to trigger an update.
         :type threshold: int
         :param logger: Logger instance for logging messages (optional).
-        :type logger: Logge
+        :type logger: Logger
         """
         self.logger = logger
         self.alpha_map = alpha_map or {

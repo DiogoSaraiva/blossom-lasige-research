@@ -149,5 +149,5 @@ class Visualization:
         """
         self.draw_overlay_data()
         self.draw_blossom_data()
-        #  self.draw_landmarks()
-        # self.draw_shoulder_line()
+        #self.draw_landmarks()
+        #self.draw_shoulder_line()

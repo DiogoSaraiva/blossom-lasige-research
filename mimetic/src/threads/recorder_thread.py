@@ -54,29 +54,26 @@ class AutonomousRecorderThread(threading.Thread):
             self.logger(f"[AutonomousRecorder] CRASHED: {e}", level="critical")
             import traceback
             traceback.print_exc()
-            return
 
-        self.logger("[AutonomousRecorder] Recording started", level="info")
+        self.logger(f"[AutonomousRecorder] Recording started at {self.fps} FPS with resolution {self.resolution[0]}x{self.resolution[1]}", level="info")
 
         delay = 1.0 / self.fps
         next_frame_time = time.time()
         try:
             while self.running:
                 now = time.time()
-                if now < next_frame_time:
-                    time.sleep(next_frame_time - now)
-                else:
-                    next_frame_time += delay
-                    frame = self.capture_thread.get_frame(mirror_video=self.mirror)
-                    if frame is not None and frame.size > 0:
-                        self.recorder.write_frame(frame)
+                sleep_time = max(0.0, next_frame_time - now)
+                time.sleep(sleep_time)
+                frame = self.capture_thread.get_frame(mirror_video=self.mirror)
+                if frame is not None and frame.size > 0:
+                    self.recorder.write_frame(frame)
+                next_frame_time += delay
         except Exception as e:
             self.logger(f"[AutonomousRecorder] CRASHED: {e}", level="critical")
             import traceback
             traceback.print_exc()
         try:
             self.recorder.stop_recording()
-            self.logger("[AutonomousRecorder] Stopped")
         except Exception as e:
             self.logger(f"[AutonomousRecorder] Error stopping recording: {e}", level="error")
 
@@ -85,6 +82,6 @@ class AutonomousRecorderThread(threading.Thread):
         Stops the recording thread and releases the recorder.
         It sets the running flag to False and stops the recorder.
         """
-        self.logger("[AutonomousRecorder] Stopping thread", level="info")
         self.running = False
         self.recorder.stop_recording()
+        self.logger("[AutonomousRecorder] Thread stopped", level="info")

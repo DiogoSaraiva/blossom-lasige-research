@@ -20,11 +20,27 @@ class FrameCaptureThread(threading.Thread):
         :type logger: Logger
         """
         super().__init__()
+
+        resolutions = [
+            (1280, 720),  # HD
+            (1024, 576),
+            (800, 600),
+            (640, 480)
+        ]
+
         self.logger = logger
         self.cap = cv2.VideoCapture(cam_index)
         if not self.cap.isOpened():
             self.logger("[ERROR] Camera failed to open.", level="error")
             raise RuntimeError("Failed to open camera")
+        for width, height in resolutions:
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+            actual_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            actual_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            if actual_width == width and actual_height == height:
+                self.logger(f"[INFO] Usando resolução máxima suportada: {width}x{height}", level="info")
+                break
         self.running = True
         self.latest_frame = None
         self.lock = threading.Lock()
@@ -80,3 +96,4 @@ class FrameCaptureThread(threading.Thread):
         self.running = False
         if self.cap.isOpened():
             self.cap.release()
+        self.logger("[FrameCaptureThread] Thread stopped", level="info")
