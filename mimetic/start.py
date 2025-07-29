@@ -1,6 +1,9 @@
 import time
 from datetime import datetime
+from typing import Tuple
+
 import cv2
+import numpy as np
 
 from mimetic.src.motion_limiter import MotionLimiter
 from mimetic.src.stream_buffer import ResultBuffer
@@ -46,6 +49,7 @@ class Mimetic:
         self.buffer = ResultBuffer(logger=self.system_logger)
         self.cam_view_title = "Pose Estimation " + " (Mirrored)" if mirror_video else ""
         self.running = True
+        self.angle_offset = {"pitch": None, "roll": None, "yaw": None}
 
     def main(self):
         """
@@ -55,26 +59,11 @@ class Mimetic:
         capture_thread = FrameCaptureThread(logger=self.system_logger)
         capture_thread.start()
 
-        timeout_sec = 5
-        interval_sec = 0.01
-        max_attempts = int(timeout_sec / interval_sec)
+        mp_thread, frame_width, frame_height = self.initialize(capture_thread)
 
-        # Wait until the first valid frame is captured
-        for _ in range(max_attempts):
-            frame_display = capture_thread.get_frame(mirror_video=True)
-            if frame_display is not None and frame_display.size > 0:
-                break
-            time.sleep(interval_sec)
-        else:
-            raise RuntimeError("Failed to capture initial frame within timeout.")
-
-        frame_height, frame_width = frame_display.shape[:2]
-        self.system_logger(f"[INFO] Detected resolution: {frame_width}x{frame_height}")
         blossom_sender_thread = BlossomSenderThread(host=self.host, port=self.port, logger=self.system_logger)
-        mp_thread = MediaPipeThread(result_buffer=self.buffer, logger=self.system_logger)
 
         blossom_sender_thread.start()
-        mp_thread.start()
 
         recorder_thread = AutonomousRecorderThread(self.recorder, capture_thread,
                                                    resolution=(frame_width, frame_height), fps=30,
@@ -122,12 +111,21 @@ class Mimetic:
                 prev_time = current_time
 
                 if None in (pitch, roll, yaw, height):
-                    pass
+                    continue
+
+                pitch_adj = pitch - self.angle_offset["pitch"]
+                roll_adj = roll - self.angle_offset["roll"]
+                yaw_adj = yaw - self.angle_offset["yaw"]
+
+
+                pitch_adj = np.clip(pitch_adj, -30, 30)
+                roll_adj = np.clip(roll_adj, -30, 30)
+                yaw_adj = np.clip(yaw_adj, -30, 30)
 
                 # Smooth pose values
-                x = self.limiter.smooth('x', pitch)
-                y = self.limiter.smooth('y', roll)
-                z = self.limiter.smooth('z', yaw)
+                x = np.radians(self.limiter.smooth('x', pitch_adj))
+                y = np.radians(self.limiter.smooth('y', roll_adj))
+                z = np.radians(self.limiter.smooth('z', yaw_adj))
                 h = self.limiter.smooth('h', height)
                 e = self.limiter.smooth('e', height)
 
@@ -218,6 +216,58 @@ class Mimetic:
         now = datetime.now()
         return now.strftime("%Y%m%d-%H%M%S") + f"{int(now.microsecond / 1000):03d}"
 
+    def initialize(self, capture_thread: FrameCaptureThread) -> Tuple[MediaPipeThread, int, int]:
+        timeout_sec = 5
+        interval_sec = 0.01
+        max_attempts = int(timeout_sec / interval_sec)
+
+        for _ in range(max_attempts):
+            frame_display = capture_thread.get_frame(mirror_video=True)
+            if frame_display is not None and frame_display.size > 0:
+                break
+            time.sleep(interval_sec)
+        else:
+            raise RuntimeError("Failed to capture initial frame within timeout.")
+
+        frame_height, frame_width = frame_display.shape[:2]
+        self.system_logger(f"[INFO] Detected resolution: {frame_width}x{frame_height}")
+
+        mp_thread = MediaPipeThread(result_buffer=self.buffer, logger=self.system_logger)
+        mp_thread.start()
+
+        # --- Calibração dos ângulos (pitch, roll, yaw) ---
+        calib_frames = []
+        calib_duration_sec = 2.0
+        start_calib = time.time()
+        self.system_logger("[Mimetic] Calibrating pose... Mantenha a cabeça neutra, sem mover.")
+
+        while time.time() - start_calib < calib_duration_sec:
+            frame = capture_thread.get_frame(mirror_video=self.mirror_video, width=min(320, frame_width),
+                                             height=min(180, frame_height))
+            if frame is None:
+                continue
+            mp_thread.send(frame)
+            pose_data, _ = self.buffer.get_latest_pose_data()
+            if pose_data is not None:
+                calib_frames.append((pose_data["pitch"], pose_data["roll"], pose_data["yaw"]))
+            time.sleep(0.01)
+
+        if calib_frames:
+            pitches, rolls, yaws = zip(*calib_frames)
+            self.angle_offset = {
+                "pitch": np.mean(pitches),
+                "roll": np.mean(rolls),
+                "yaw": np.mean(yaws)
+            }
+            self.system_logger("[Mimetic] Calibração concluída:")
+            self.system_logger(f"  pitch offset = {self.angle_offset['pitch']:.2f}°")
+            self.system_logger(f"  roll  offset = {self.angle_offset['roll']:.2f}°")
+            self.system_logger(f"  yaw   offset = {self.angle_offset['yaw']:.2f}°")
+        else:
+            raise RuntimeError("Falha na calibração: nenhum frame válido.")
+
+        return mp_thread, frame_width, frame_height
+
 
 import argparse
 
@@ -232,7 +282,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Mimetic Pose Estimation and Recording Tool")
     parser.add_argument("--output_folder", type=str, default="recordings", help="Folder to save recordings")
     parser.add_argument("--study_id", type=str, default=None, help="Study ID for the recording")
-    parser.add_argument("--host", type=str, default="localhost", help="Blossom server host")
+    parser.add_argument("--host", type=str, default="10.101.120.42", help="Blossom server host")
     parser.add_argument("--port", type=int, default=8000, help="Blossom server port")
     parser.add_argument("--mirror_video", type=str, default="true", help="Mirror video (true/false)")
     parser.add_argument("--print_to_terminal", type=str, default="true", help="Print logs to terminal (true/false)")

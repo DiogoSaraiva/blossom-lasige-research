@@ -18,16 +18,7 @@ class MotionLimiter:
         values (dict): Stores the last value for each key.
     """
 
-    def __init__(self, alpha_map: dict=None, rate_hz: int=5, threshold: int=2.0, logger:Logger=None):
-        """
-        Initializes the MotionLimiter with smoothing parameters, update rate, threshold, and logger.
-
-        Args:
-            alpha_map (dict, optional): Mapping of keys to smoothing factors.
-            rate_hz (int, optional): Update rate in Hz. Default is 5.
-            threshold (float, optional): Minimum change to trigger update. Default is 2.0.
-            logger (Logger, optional): Logger instance.
-        """
+    def __init__(self, logger: Logger, alpha_map: dict=None, rate_hz: int=5, threshold: float=2.0, ):
         self.logger = logger
         self.alpha_map = alpha_map or {
             "x": 0.3,  # pitch
@@ -49,96 +40,35 @@ class MotionLimiter:
         self.last_data = self.smoothed.copy()
         self.values = {}
 
-    @staticmethod
-    def to_six_unit_range(value: float, min_val: float, max_val: float) -> float:
-        """
-        Scales a value to a 0-6 range, clipping to [min_val, max_val].
-
-        Args:
-            value (float): Value to scale.
-            min_val (float): Minimum value of the range.
-            max_val (float): Maximum value of the range.
-
-        Returns:
-            float: Value scaled to [0, 6].
-        """
-        return np.clip((value - min_val) / (max_val - min_val), 0.0, 1.0) * 6.0
-
-    def smooth_and_scale(self, key: str, value: float) -> float:
-        """
-        Smooths and scales the value for a given key.
-
-        Args:
-            key (str): Key to smooth and scale.
-            value (float): Value to process.
-
-        Returns:
-            float: Smoothed and scaled value.
-        """
-        smoothed = self._smooth(key, value)
-
-        match key:
-            case "x" | "y":
-                return self.to_six_unit_range(np.clip(smoothed, -150, 150), -150, 150)
-            case "z":
-                return self.to_six_unit_range(np.clip(smoothed, -40, 40), 0, 100)
-            case "h":
-                return self.to_six_unit_range(np.clip(smoothed, 0, 100), 0, 100)
-            case "e":
-                return self.to_six_unit_range(np.clip(smoothed, 50, 130), 50, 130)
-            case _:
-                return smoothed
-
     def smooth(self, key: str, value: float) -> float | None:
         """
-        Wrapper to smooth and scale a value for a given key.
+        Applies exponential smoothing to the value and returns the result.
+        Does not scale or normalize the result.
 
         Args:
-            key (str): Key to process.
-            value (float): Value to process.
+            key (str): One of "x", "y", "z", "h", "e"
+            value (float): The input value (in degrees or 0-100 for h/e)
 
         Returns:
-            float or None: Smoothed and scaled value, or None if key is not recognized.
+            float or None: Smoothed value or None if input is invalid.
         """
-        match key:
-            case "x" | "y":
-                return self.smooth_and_scale("x", value)
-            case "z":
-                return self.smooth_and_scale("z", value)
-            case "h":
-                return self.smooth_and_scale("h", value)
-            case "e":
-                return self.smooth_and_scale("e", value)
-        return None
-
-    def _smooth(self, key: str, value: float) -> float:
-        """
-        Applies exponential moving average smoothing to a value.
-
-        Args:
-            key (str): Key to smooth.
-            value (float): Value to smooth.
-
-        Returns:
-            float: Smoothed value.
-        """
-        alpha = self.alpha_map.get(key, 0.3)
-        prev = self.smoothed.get(key, 0.0)
         if value is None:
             return None
+        alpha = self.alpha_map.get(key, 0.3)
+        prev = self.smoothed.get(key, 0.0)
         smoothed = alpha * value + (1 - alpha) * prev
         self.smoothed[key] = smoothed
         return smoothed
 
     def should_send(self, keys: list) -> tuple[bool, float | None]:
         """
-        Determines if an update should be sent based on smoothed values and time interval.
+        Determines if an update should be sent based on change threshold and time interval.
 
         Args:
-            keys (list): Keys to check for changes.
+            keys (list): Keys to check (e.g., ["x", "y", "z", "h"])
 
         Returns:
-            tuple: (should_send (bool), duration (float or None))
+            tuple: (should_send (bool), duration (float in seconds or None))
         """
         now = time.time()
         if now - self.last_sent < self.min_interval:

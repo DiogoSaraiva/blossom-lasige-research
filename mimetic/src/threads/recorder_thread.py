@@ -68,6 +68,8 @@ class AutonomousRecorderThread(threading.Thread):
 
         delay = 1.0 / self.fps
         next_frame_time = time.time()
+        start_time = time.time()
+        last_pts = -1
         try:
             while self.running:
                 now = time.time()
@@ -75,7 +77,11 @@ class AutonomousRecorderThread(threading.Thread):
                 time.sleep(sleep_time)
                 frame = self.capture_thread.get_frame(mirror_video=self.mirror)
                 if frame is not None and frame.size > 0:
-                    self.recorder.write_frame(frame)
+                    pts = int((now - start_time) * 1000)  # PTS em ms
+                    if pts <= last_pts:
+                        pts = last_pts + 1
+                    last_pts = pts
+                    self.recorder.write_frame(frame, pts=pts)
                 next_frame_time += delay
         except Exception as e:
             self.logger(f"[AutonomousRecorder] CRASHED: {e}", level="critical")
