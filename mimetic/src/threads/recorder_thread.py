@@ -75,6 +75,8 @@ class AutonomousRecorderThread(threading.Thread):
                 now = time.time()
                 sleep_time = max(0.0, next_frame_time - now)
                 time.sleep(sleep_time)
+                if not self.running:
+                    break
                 frame = self.capture_thread.get_frame(mirror_video=self.mirror)
                 if frame is not None and frame.size > 0:
                     pts = int((now - start_time) * 1000)  # PTS em ms
@@ -97,6 +99,7 @@ class AutonomousRecorderThread(threading.Thread):
         Stops the recording thread and releases the recorder.
         It sets the running flag to False and stops the recorder.
         """
+        self.logger("[AutonomousRecorder] Stop called", level="debug")
         self.running = False
         self.recorder.stop_recording()
         self.logger("[AutonomousRecorder] Thread stopped", level="info")

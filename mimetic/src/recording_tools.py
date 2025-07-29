@@ -98,7 +98,7 @@ class Recorder:
         Notes:
             Skips frames with non-increasing PTS to avoid duplicates.
         """
-        if not self.is_recording or not self.video_writer:
+        if not self.is_recording or self.video_writer is None:
             self.logger("[Recorder] Cannot write frame: not recording or writer missing.", level='critical')
             return
 

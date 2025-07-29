@@ -20,11 +20,13 @@ class MotionLimiter:
 
     def __init__(self, logger: Logger, alpha_map: dict=None, rate_hz: int=5, threshold: float=2.0, ):
         self.logger = logger
+        # Higher alpha value - Less filtered, higher response time
+        # Less alpha value - More filtered, lower response time
         self.alpha_map = alpha_map or {
-            "x": 0.3,  # pitch
-            "y": 0.2,  # roll
-            "z": 0.1,  # yaw
-            "h": 0.3,  # height
+            "x": 0.4,  # pitch
+            "y": 0.4,  # roll
+            "z": 0.4,  # yaw
+            "h": 0.2,  # height
             "e": 0.2   # ears
         }
         self.smoothed = {

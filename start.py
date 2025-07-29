@@ -61,7 +61,7 @@ try:
 except KeyboardInterrupt:
     print("Interrupted manually.")
 
-# Clean up all processes com verificação de status
+# Clean up all processes with status verification
 for proc in [mimetic_proc, mimetic_server_proc, dancer_proc, dancer_server_proc]:
     if proc.poll() is None:
         proc.terminate()

@@ -113,19 +113,18 @@ class Mimetic:
                 if None in (pitch, roll, yaw, height):
                     continue
 
-                pitch_adj = pitch - self.angle_offset["pitch"]
-                roll_adj = roll - self.angle_offset["roll"]
-                yaw_adj = yaw - self.angle_offset["yaw"]
+                pitch -= self.angle_offset["pitch"]
+                roll -= self.angle_offset["roll"]
+                yaw -= self.angle_offset["yaw"]
 
-
-                pitch_adj = np.clip(pitch_adj, -30, 30)
-                roll_adj = np.clip(roll_adj, -30, 30)
-                yaw_adj = np.clip(yaw_adj, -30, 30)
+                pitch = np.clip(pitch, -30, 30)
+                roll = np.clip(roll, -30, 30)
+                yaw = np.clip(yaw, -30, 30)
 
                 # Smooth pose values
-                x = np.radians(self.limiter.smooth('x', pitch_adj))
-                y = np.radians(self.limiter.smooth('y', roll_adj))
-                z = np.radians(self.limiter.smooth('z', yaw_adj))
+                x = np.radians(self.limiter.smooth('x', pitch))
+                y = np.radians(self.limiter.smooth('y', roll))
+                z = np.radians(self.limiter.smooth('z', yaw))
                 h = self.limiter.smooth('h', height)
                 e = self.limiter.smooth('e', height)
 
@@ -192,11 +191,11 @@ class Mimetic:
             capture_thread.join(timeout=2)
             blossom_sender_thread.stop()
             blossom_sender_thread.join(timeout=2)
+            self.recorder.stop_recording()
             recorder_thread.stop()
             recorder_thread.join(timeout=2)
             mp_thread.stop()
             mp_thread.join(timeout=2)
-            self.recorder.stop_recording()
             self.pose_logger.save_log()
             if isinstance(self.system_logger, Logger):
                 self.system_logger.save_log()
@@ -235,11 +234,11 @@ class Mimetic:
         mp_thread = MediaPipeThread(result_buffer=self.buffer, logger=self.system_logger)
         mp_thread.start()
 
-        # --- Calibração dos ângulos (pitch, roll, yaw) ---
+        # --- Angle calibration (pitch, roll, yaw) ---
         calib_frames = []
         calib_duration_sec = 2.0
         start_calib = time.time()
-        self.system_logger("[Mimetic] Calibrating pose... Mantenha a cabeça neutra, sem mover.")
+        self.system_logger("[Mimetic] Calibrating pose... Hold you head neutral and remain still.", level="info")
 
         while time.time() - start_calib < calib_duration_sec:
             frame = capture_thread.get_frame(mirror_video=self.mirror_video, width=min(320, frame_width),
@@ -259,15 +258,17 @@ class Mimetic:
                 "roll": np.mean(rolls),
                 "yaw": np.mean(yaws)
             }
-            self.system_logger("[Mimetic] Calibração concluída:")
-            self.system_logger(f"  pitch offset = {self.angle_offset['pitch']:.2f}°")
-            self.system_logger(f"  roll  offset = {self.angle_offset['roll']:.2f}°")
-            self.system_logger(f"  yaw   offset = {self.angle_offset['yaw']:.2f}°")
+            self.system_logger(
+                f"[Mimetic] Calibration complete:\n"
+                f" pitch offset = {self.angle_offset['pitch']:.2f}°\n"
+                f" roll  offset = {self.angle_offset['roll']:.2f}°\n"
+                f" yaw   offset = {self.angle_offset['yaw']:.2f}°",
+                level="info"
+            )
         else:
-            raise RuntimeError("Falha na calibração: nenhum frame válido.")
+            raise RuntimeError("Failed calibration: No valid frame captured.")
 
         return mp_thread, frame_width, frame_height
-
 
 import argparse
 

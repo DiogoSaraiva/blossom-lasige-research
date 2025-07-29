@@ -19,14 +19,16 @@ def wait_for_server_ready(port, timeout=10.0, interval=0.5):
     print(f"Timeout: Blossom server on port {port} not responding.")
     return False
 
+
 # Launch MIMETIC server
 print("Launching blossom_public/start.py (MIMETIC)...")
 mimetic_server_proc = subprocess.Popen([
     "python3", "blossom_public/start.py",
     "--host", HOST,
     "--port", str(MIMETIC_PORT),
-    "--browser-disable"
-])
+    "--browser-disable"],
+    stdin=subprocess.DEVNULL,
+)
 
 # Wait for both to be ready
 if not wait_for_server_ready(MIMETIC_PORT):
@@ -36,8 +38,10 @@ if not wait_for_server_ready(MIMETIC_PORT):
 
 # Launch mimetic controller
 print("Launching mimetic/start.py...")
-mimetic_proc = subprocess.Popen(["python3", "mimetic/start.py"])
-
+mimetic_proc = subprocess.Popen(
+    ["python3", "mimetic/start.py"],
+    stdin=subprocess.DEVNULL,
+)
 
 try:
     print("\n Press [q] then [Enter] at any time to stop all processes.\n")
@@ -49,7 +53,7 @@ try:
 except KeyboardInterrupt:
     print("Interrupted manually.")
 
-# Clean up all processes com verificação de status
+# Clean up all processes with status verification
 for proc in [mimetic_proc, mimetic_server_proc]:
     if proc.poll() is None:
         proc.terminate()
