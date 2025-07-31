@@ -11,9 +11,9 @@ from mediapipe.tasks.python.vision import (
     FaceLandmarkerResult, PoseLandmarkerResult
 )
 
-from mimetic.src.logging_utils import Logger
+from src.logging_utils import Logger
 from mimetic.src.pose_utils import PoseUtils
-from mimetic.src.stream_buffer import ResultBuffer
+from mimetic.src.pose_buffer import PoseBuffer
 
 
 class MediaPipeThread(threading.Thread):
@@ -24,17 +24,17 @@ class MediaPipeThread(threading.Thread):
     in real-time from video frames. It runs asynchronously and processes frames from a queue.
 
     Args:
-        result_buffer (ResultBuffer): Buffer to store processed pose data.
+        result_buffer (PoseBuffer): Buffer to store processed pose data.
         model_dir (str, optional): Directory containing MediaPipe model files.
         max_queue (int, optional): Maximum number of frames in the processing queue.
         logger (Logger, optional): Logger instance for logging messages.
     """
-    def __init__(self, result_buffer: ResultBuffer, logger: Logger, model_dir: str = None, max_queue=8):
+    def __init__(self, result_buffer: PoseBuffer, logger: Logger, model_dir: str = None, max_queue=8):
         """
         Initialize the MediaPipeThread.
 
         Args:
-            result_buffer (ResultBuffer): Buffer to store processed pose data.
+            result_buffer (PoseBuffer): Buffer to store processed pose data.
             model_dir (str, optional): Directory containing MediaPipe model files.
             max_queue (int, optional): Maximum number of frames in the processing queue.
             logger (Logger): Logger instance for logging messages.
@@ -108,16 +108,15 @@ class MediaPipeThread(threading.Thread):
                 except Exception as e:
                     self.logger(f"[MediaPipe] Frame processing error: {e}", level="debug")
         except Exception as e:
-            self.logger(f"[MediaPipe] CRASHED: {e}", level="critical")
             import traceback
-            traceback.print_exc()
+            self.logger(f"[MediaPipe] CRASHED: {e} \n {traceback.format_exc()}", level="critical")
 
     def _valid_queue_item(self, item):
         return item is not None and isinstance(item, tuple) and len(item) == 2
 
     def _process_frame(self, frame, timestamp):
         if not isinstance(frame, np.ndarray):
-            self.logger("[MediaPipe] Invalid frame")
+            self.logger("[MediaPipe] Invalid frame", level="Warning")
             return
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame)
         self.face_landmarker.detect_async(mp_image, timestamp)

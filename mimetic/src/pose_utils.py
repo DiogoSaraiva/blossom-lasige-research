@@ -2,7 +2,7 @@ import math
 import numpy as np
 import mediapipe as mp
 
-from mimetic.src.logging_utils import Logger
+from src.logging_utils import Logger
 
 FACE_MESH_LANDMARKS = {
     'left_eye': 33,

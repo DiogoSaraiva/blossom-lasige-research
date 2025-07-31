@@ -1,7 +1,8 @@
 import threading
+# noinspection PyPackageRequirements
 import cv2
 
-from mimetic.src.logging_utils import Logger
+from src.logging_utils import Logger
 
 class FrameCaptureThread(threading.Thread):
     """

@@ -1,10 +1,10 @@
 import time
 from threading import Lock
 
-from mimetic.src.logging_utils import Logger
+from src.logging_utils import Logger
 
 
-class ResultBuffer:
+class PoseBuffer:
     """
     Thread-safe buffer for storing and retrieving face and pose detection results.
 

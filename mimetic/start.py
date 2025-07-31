@@ -6,15 +6,13 @@ import cv2
 import numpy as np
 
 from mimetic.src.motion_limiter import MotionLimiter
-from mimetic.src.stream_buffer import ResultBuffer
-from mimetic.src.threads.recorder_thread import AutonomousRecorderThread
+from mimetic.src.pose_buffer import PoseBuffer
+from src.threads.recorder_thread import RecorderThread
 from mimetic.src.threads.blossom_sender import BlossomSenderThread
-from mimetic.src.threads.frame_capture import FrameCaptureThread
+from src.threads.frame_capture import FrameCaptureThread
 from mimetic.src.threads.mediapipe_thread import MediaPipeThread
 from mimetic.src.visual_utils import Visualization
-from mimetic.src.logging_utils import Logger, print_logger
-from mimetic.src.recording_tools import Recorder
-
+from src.logging_utils import Logger
 
 class Mimetic:
     """
@@ -27,10 +25,8 @@ class Mimetic:
         host (str): Blossom server address.
         port (int): Blossom server port.
         mirror_video (bool, optional): If True, mirror the video in visualization and recording.
-        print_to_terminal (bool, optional): If True, print logs to terminal; otherwise, save to file.
     """
-    def __init__(self, output_folder: str, study_id: str or int, host: str, port: int, mirror_video: bool = True,
-                 print_to_terminal: bool = True):
+    def __init__(self, output_folder: str, study_id: str or int, host: str, port: int, mirror_video: bool = True):
         """
         Initializes the main parts of the Mimetic system.
         """
@@ -39,17 +35,16 @@ class Mimetic:
         self.host = host
         self.port = port
         self.mirror_video = mirror_video
-        self.debug_mode = print_to_terminal
         self.pose_logger = Logger(f"{output_folder}/{self.study_id}/pose_log.json", mode="pose")
-        self.system_logger = Logger(f"{output_folder}/{self.study_id}/system_log.json", mode="system") if (
-                    print_to_terminal == False) else print_logger
-        self.recorder = Recorder(f"{output_folder}/{self.study_id}/recording.mp4", logger=self.system_logger)
+        self.system_logger = Logger(f"{output_folder}/{self.study_id}/system_log.json", mode="system")
         self.limiter = MotionLimiter(logger=self.system_logger)
         self.visualization = Visualization(logger=self.system_logger)
-        self.buffer = ResultBuffer(logger=self.system_logger)
+        self.buffer = PoseBuffer(logger=self.system_logger)
         self.cam_view_title = "Pose Estimation " + " (Mirrored)" if mirror_video else ""
         self.running = True
         self.angle_offset = {"pitch": None, "roll": None, "yaw": None}
+        self.output_folder = output_folder
+
 
     def main(self):
         """
@@ -65,9 +60,9 @@ class Mimetic:
 
         blossom_sender_thread.start()
 
-        recorder_thread = AutonomousRecorderThread(self.recorder, capture_thread,
-                                                   resolution=(frame_width, frame_height), fps=30,
-                                                   mirror=self.mirror_video, logger=self.system_logger)
+        recorder_thread = RecorderThread(output_path=f"{self.output_folder}/{self.study_id}/recording.mp4", capture_thread=capture_thread,
+                                         resolution=(frame_width, frame_height), fps=30,
+                                         mirror=self.mirror_video, logger=self.system_logger)
         recorder_thread.start()
 
         last_pose_data = None
@@ -95,6 +90,12 @@ class Mimetic:
 
                 # Read results from buffer
                 pose_data, _ = self.buffer.get_latest_pose_data()
+
+                if pose_data is None:
+                    self.system_logger("[Main] No pose data received yet", level="debug")
+                    time.sleep(0.01)
+                    continue
+
                 if pose_data is not None:
                     last_pose_data = pose_data
 
@@ -191,14 +192,10 @@ class Mimetic:
             capture_thread.join(timeout=2)
             blossom_sender_thread.stop()
             blossom_sender_thread.join(timeout=2)
-            self.recorder.stop_recording()
             recorder_thread.stop()
             recorder_thread.join(timeout=2)
             mp_thread.stop()
             mp_thread.join(timeout=2)
-            self.pose_logger.save_log()
-            if isinstance(self.system_logger, Logger):
-                self.system_logger.save_log()
             try:
                 cv2.destroyAllWindows()
             except cv2.error:
@@ -235,20 +232,33 @@ class Mimetic:
         mp_thread.start()
 
         # --- Angle calibration (pitch, roll, yaw) ---
-        calib_frames = []
         calib_duration_sec = 2.0
-        start_calib = time.time()
-        self.system_logger("[Mimetic] Calibrating pose... Hold you head neutral and remain still.", level="info")
+        self.system_logger("[Mimetic] Calibrating pose... Hold your head neutral and remain still.", level="info")
 
-        while time.time() - start_calib < calib_duration_sec:
-            frame = capture_thread.get_frame(mirror_video=self.mirror_video, width=min(320, frame_width),
-                                             height=min(180, frame_height))
-            if frame is None:
-                continue
-            mp_thread.send(frame)
-            pose_data, _ = self.buffer.get_latest_pose_data()
-            if pose_data is not None:
-                calib_frames.append((pose_data["pitch"], pose_data["roll"], pose_data["yaw"]))
+        calib_frames = []
+        valid_start_time = None
+
+        while True:
+            frame = capture_thread.get_frame(
+                mirror_video=self.mirror_video,
+                width=min(320, frame_width),
+                height=min(180, frame_height)
+            )
+
+            if frame is not None:
+                mp_thread.send(frame)
+                pose_data, _ = self.buffer.get_latest_pose_data()
+
+                if pose_data is not None:
+                    if valid_start_time is None:
+                        valid_start_time = time.time()
+                    calib_frames.append((pose_data["pitch"], pose_data["roll"], pose_data["yaw"]))
+                    elapsed_valid_time = time.time() - valid_start_time
+                    if elapsed_valid_time >= calib_duration_sec:
+                        break
+            else:
+                valid_start_time = None
+
             time.sleep(0.01)
 
         if calib_frames:
@@ -286,7 +296,6 @@ def parse_args():
     parser.add_argument("--host", type=str, default="10.101.120.42", help="Blossom server host")
     parser.add_argument("--port", type=int, default=8000, help="Blossom server port")
     parser.add_argument("--mirror_video", type=str, default="true", help="Mirror video (true/false)")
-    parser.add_argument("--print_to_terminal", type=str, default="true", help="Print logs to terminal (true/false)")
     return parser.parse_args()
 
 
@@ -299,7 +308,6 @@ if __name__ == "__main__":
         host=args.host,
         port=args.port,
         mirror_video=(args.mirror_video.lower() == "true"),
-        print_to_terminal=(args.print_to_terminal.lower() == "true")
     )
     mimetic.main()
     print("[Mimetic] Application finished.")
