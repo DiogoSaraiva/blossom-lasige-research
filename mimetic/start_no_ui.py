@@ -163,8 +163,9 @@ class Mimetic:
         if not self.is_sending:
             self.logger(f"[Mimetic] Sending not enabled.", level="warning")
             return
-        self.blossom_sender_thread.stop()
         self.is_sending = False
+        self.blossom_sender_thread.stop()
+
 
     def initialize(self) -> Tuple[int, int]:
         timeout_sec = 5

@@ -215,10 +215,15 @@ class MediaPipeThread(threading.Thread):
                 facemesh_landmarks=face_landmarks,
                 pose_landmarks=pose_landmarks
             )
+
+            pitch, roll, yaw = pose_utils.get_head_orientation()
+            # pitch = pose_utils.calculate_pitch()
+            # roll = pose_utils.calculate_roll()
+            # yaw = pose_utils.calculate_yaw()
             pose_data = {
-                "pitch": pose_utils.calculate_pitch(),
-                "roll": pose_utils.calculate_roll(),
-                "yaw": pose_utils.calculate_yaw(),
+                "pitch": pitch,
+                "roll": roll,
+                "yaw": yaw,
                 "height": pose_utils.estimate_height(),
                 "timestamp_ms": timestamp_ms
             }

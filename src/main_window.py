@@ -230,11 +230,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def reset_mimetic_blossom(self):
         self.mimetic.stop_sending()
         self.send_blossom_command("mimetic", "reset")
-        QTimer.singleShot(1000, lambda: self.send_blossom_command("mimetic", "q"))
+        QTimer.singleShot(200, lambda: self.send_blossom_command("mimetic", "q"))
+        QTimer.singleShot(300,lambda :self.mimetic.stop())
 
     def start_dancer_blossom(self):
         self.launch_blossom("dancer")
-
 
     def reset_dancer_blossom(self):
         self.send_blossom_command("dancer", "reset")
