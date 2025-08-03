@@ -51,7 +51,7 @@ border: 1px solid #666;</string>
      </widget>
     </item>
     <item row="3" column="1" colspan="2">
-     <widget class="QPushButton" name="start_mimetic">
+     <widget class="QPushButton" name="mimetic_button">
       <property name="text">
        <string>Start Mimetic</string>
       </property>
@@ -607,24 +607,24 @@ QCheckBox::indicator:unchecked {
      </widget>
     </item>
     <item row="0" column="4">
-     <widget class="QPushButton" name="start_recording_button">
+     <widget class="QPushButton" name="recording_button">
       <property name="locale">
        <locale language="English" country="UnitedStates"/>
       </property>
       <property name="text">
-       <string>Record</string>
+       <string>Start Rec.</string>
       </property>
      </widget>
     </item>
     <item row="3" column="3" colspan="2">
-     <widget class="QPushButton" name="start_dancer">
+     <widget class="QPushButton" name="dancer_button">
       <property name="text">
        <string>Start Dancer</string>
       </property>
      </widget>
     </item>
     <item row="0" column="1" colspan="2">
-     <widget class="QPushButton" name="start_pose_button">
+     <widget class="QPushButton" name="pose_button">
       <property name="locale">
        <locale language="English" country="UnitedStates"/>
       </property>

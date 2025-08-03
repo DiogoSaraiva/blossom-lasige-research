@@ -53,8 +53,6 @@ class Mimetic:
         frame_duration = 1.0 / target_fps
         frame_width, frame_height = self.initialize()
 
-
-
         try:
             while not self._stop_event.is_set():
                 frame_start_time = time.time()
@@ -164,7 +162,9 @@ class Mimetic:
             self.logger(f"[Mimetic] Sending not enabled.", level="warning")
             return
         self.is_sending = False
-        self.blossom_sender_thread.stop()
+        if self.blossom_sender_thread.is_alive():
+            self.blossom_sender_thread.stop()
+            self.blossom_sender_thread.join()
 
 
     def initialize(self) -> Tuple[int, int]:
@@ -236,6 +236,7 @@ class Mimetic:
 
     def stop(self):
         self.logger("[Mimetic] Stopping...", level="info")
+        self.data = None
         self._stop_event.set()
         if self._thread is not None and self._thread.is_alive():
             self._thread.join()

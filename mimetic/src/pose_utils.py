@@ -1,6 +1,6 @@
 import math
+
 import numpy as np
-import mediapipe as mp
 
 from src.logging_utils import Logger
 
@@ -31,10 +31,9 @@ class PoseUtils:
         logger (Logger): Logger instance for logging messages.
         face_landmarks (list): List of face mesh landmarks.
         pose_landmarks (list): List of pose landmarks.
-        mp_pose: Reference to MediaPipe pose solution.
     """
 
-    def __init__(self, facemesh_landmarks, pose_landmarks, logger:Logger):
+    def __init__(self, logger:Logger):
         """
         Initializes the PoseUtils class with face mesh and pose landmarks, and a logger.
 
@@ -44,9 +43,8 @@ class PoseUtils:
             logger (Logger): Logger instance for logging messages.
         """
         self.logger = logger
-        self.face_landmarks = facemesh_landmarks
-        self.pose_landmarks = pose_landmarks
-        self.mp_pose = mp.solutions.pose
+        self.face_landmarks = None
+        self.pose_landmarks = None
 
     def update(self, facemesh_landmarks, pose_landmarks):
         """

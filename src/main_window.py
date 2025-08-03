@@ -40,8 +40,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.capture_thread = FrameCaptureThread(logger=self.logger)
         self.capture_thread.start()
 
-        self.mimetic_launcher = BlossomServerLauncher(logger=self.logger, blossom_type="mimetic")
-
         self.log_timer = QTimer()
         self.log_timer.timeout.connect(self.load_logs_to_textedit) # type: ignore
         self.log_timer.start(200)
@@ -52,11 +50,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         while time.time() - start_time < max_wait:
             frame = self.capture_thread.get_frame(mirror_video=self.mirror_video)
             if frame is not None:
-                frame_height, frame_width = frame.shape[:2]
+                self.frame_height, self.frame_width = frame.shape[:2]
                 break
         else:
             self.logger("Failed to retrieve frame resolution in time.", level="error")
-            frame_height, frame_width = 480, 640  # fallback default
+            self.frame_height, self.frame_width = 480, 640  # fallback default
 
         self.mimetic = Mimetic(
             study_id=self.study_id,
@@ -70,29 +68,24 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 "pose": None
             }
         )
-        self.mimetic_thread = MimeticRunnerThread(self.mimetic)
-        self.calib_thread = CalibrateThread(self.mimetic)
+        self.mimetic_thread = None
+        self.calib_thread = None
         self.main()
-        self.recorder_thread = RecorderThread(output_path=f"{self.output_folder}/{self.study_id}/recording.mp4",
-                                              resolution=(frame_width, frame_height), fps=30,
-                                              mirror=self.mirror_video, logger=self.logger, capture_thread=self.capture_thread)
-
-
+        self.recorder_thread = None
 
     def main(self):
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_video_frame) # type: ignore
         self.timer.start(30)
 
-        self.mimetic_thread.data_updated.connect(self.update_mimetic_data)
 
 
-        self.start_pose_button.clicked.connect(self.start_pose_recognition)
+        self.pose_button.clicked.connect(self.toggle_pose_recognition)
         self.calibrate_pose_button.clicked.connect(self.calibrate_pose)
-        self.start_recording_button.clicked.connect(self.start_recording)
-        self.start_mimetic.clicked.connect(self.start_mimetic_blossom)
+        self.recording_button.clicked.connect(self.toggle_recording)
+        self.mimetic_button.clicked.connect(self.start_mimetic_blossom)
         self.reset_mimetic.clicked.connect(self.reset_mimetic_blossom)
-        self.start_dancer.clicked.connect(self.start_dancer_blossom)
+        self.dancer_button.clicked.connect(self.start_dancer_blossom)
         self.reset_dancer.clicked.connect(self.reset_dancer_blossom)
 
     def update_video_frame(self):
@@ -116,14 +109,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if self.capture_thread:
             self.capture_thread.stop()
             self.capture_thread.join()
-        if self.mimetic:
+        if self.mimetic.running:
             self.mimetic.stop()
-        if self.recorder_thread.running:
+            self.mimetic_thread.stop()
+            self.mimetic_thread.wait()
+
+        if self.recorder_thread and self.recorder_thread.running:
             self.recorder_thread.stop()
             self.recorder_thread.join()
         event.accept()
 
     def calibrate_pose(self):
+        self.calib_thread = CalibrateThread(self.mimetic)
         self.calibrate_pose_button.setEnabled(False)
         self.calibrate_pose_button.setText("Calibrating")
 
@@ -140,44 +137,69 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.calibrate_pose_button.setEnabled(True)
         self.calibrate_pose_button.setText("Calibrate")
 
+    def toggle_pose_recognition(self):
+        if not self.mimetic.running:
+            self.start_pose_recognition()
+        else:
+            self.stop_pose_recognition()
+
     def start_pose_recognition(self):
+        self.mimetic_thread = MimeticRunnerThread(self.mimetic)
+        self.mimetic_thread.data_updated.connect(self.update_mimetic_data)
+        if self.mimetic.running:
+            self.logger("Pose recognition already running", level="warning")
+            return
         self.logger("Starting Pose Recognition...", level="info")
         self.mimetic.start()
         self.mimetic_thread.start()
+        self.pose_button.setText("Stop Pose Recognition")
+
+    def stop_pose_recognition(self):
+        if not self.mimetic.running:
+            self.logger("Pose recognition already stopped", level="warning")
+            return
+        self.logger("Stopping Pose Recognition...", level="info")
+        if self.mimetic.is_sending:
+            self.mimetic.stop_sending()
+        self.mimetic.stop()
+        self.mimetic_thread.stop()
+        self.pose_button.setText("Start Pose Recognition")
 
     def update_mimetic_data(self, data: dict):
+        def format_val(val: float, suffix: str = '') -> str:
+            return f"{val:.2f}{suffix}" if val is not None else "--"
+
         axis = data.get("axis")
         if axis is not None:
-            pitch = axis.get("pitch")
-            roll = axis.get("roll")
-            yaw = axis.get("yaw")
-            self.pose_pitch_value.setText(f"{pitch:.2f}°" if pitch is not None else "---")
-            self.pose_roll_value.setText(f"{roll:.2f}°" if roll is not None else "---")
-            self.pose_yaw_value.setText(f"{yaw:.2f}°" if yaw is not None else "---")
-        height = data.get("height")
-        self.pose_height_value.setText(f"{height:.2f}°" if height is not None else "---")
+            pitch, roll, yaw = axis.get("pitch"), axis.get("roll"), axis.get("yaw")
+        else:
+            pitch = roll = yaw = None
+
+        self.pose_pitch_value.setText(format_val(pitch, 'º'))
+        self.pose_roll_value.setText(format_val(roll, 'º'))
+        self.pose_yaw_value.setText(format_val(yaw, 'º'))
+
+        self.pose_height_value.setText(format_val(data.get("height")))
 
         blossom_data = data.get("blossom_data")
+
         if blossom_data is not None:
             x = blossom_data.get("x")
             y = blossom_data.get("y")
             z = blossom_data.get("z")
             h = blossom_data.get("h")
             e = blossom_data.get("e")
-            self.blossom_pitch_value.setText(f"{x:.2f}°" if x is not None else "---")
-            self.blossom_roll_value.setText(f"{y:.2f}°" if y is not None else "---")
-            self.blossom_yaw_value.setText(f"{z:.2f}°" if z is not None else "---")
-            self.blossom_height_value.setText(f"{h:.2f}" if h is not None else "---")
-            self.blossom_ears_value.setText(f"{e:.2f}" if e is not None else "---")
-            data_sent = data.get("data_sent", False)
-            self.data_sent.setChecked(bool(data_sent))
 
-    def on_mimetic_server_ready(self):
-        if self.mimetic_launcher.success:
-            self.logger("Mimetic Blossom server started successfully.")
-            self.mimetic_server_process = self.mimetic_launcher.server_proc
         else:
-            self.logger("Failed to start Mimetic Blossom server.", level="error")
+            x = y = z = h = e = None
+        data_sent = data.get("data_sent", False)
+
+        self.blossom_pitch_value.setText(format_val(x, 'rad'))
+        self.blossom_roll_value.setText(format_val(y, 'rad'))
+        self.blossom_yaw_value.setText(format_val(z, 'rad'))
+        self.blossom_height_value.setText(format_val(h))
+        self.blossom_ears_value.setText(format_val(e))
+        self.data_sent.setChecked(bool(data_sent))
 
     def launch_blossom(self, blossom_type: str):
         attr = f"{blossom_type}_launcher"
@@ -194,6 +216,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             if launcher.success:
                 self.logger(f"{blossom_type.capitalize()} Blossom server started successfully.")
                 setattr(self, proc_attr, launcher.server_proc)
+
+                # lógica extra se for o mimetic
+                if blossom_type == "mimetic":
+                    self.logger("Mimetic Blossom server is ready. Starting sender thread.", level="info")
+                    self.mimetic.start_sending()
+
             else:
                 self.logger(f"Failed to start {blossom_type.capitalize()} Blossom server.", level="error")
 
@@ -218,38 +246,50 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def start_mimetic_blossom(self):
         self.launch_blossom("mimetic")
 
-        def on_ready():
-            if self.mimetic_launcher.success:
-                self.logger("Mimetic Blossom server is ready. Starting sender thread.", level="info")
-                self.mimetic.start_sending()
-            else:
-                self.logger("Failed to start Mimetic Blossom server.", level="error")
-
-        self.mimetic_launcher.finished.connect(on_ready)
-
     def reset_mimetic_blossom(self):
-        self.mimetic.stop_sending()
-        self.send_blossom_command("mimetic", "reset")
-        QTimer.singleShot(200, lambda: self.send_blossom_command("mimetic", "q"))
-        QTimer.singleShot(300,lambda :self.mimetic.stop())
+        if self.mimetic.is_sending:
+            self.mimetic.stop_sending()
+            self.send_blossom_command("mimetic", "reset")
+            QTimer.singleShot(100, lambda: self.send_blossom_command("mimetic", "q"))
+        else:
+            self.logger("Mimetic is already stopped.", level="warning")
 
     def start_dancer_blossom(self):
         self.launch_blossom("dancer")
 
     def reset_dancer_blossom(self):
         self.send_blossom_command("dancer", "reset")
-        QTimer.singleShot(1000, lambda: self.send_blossom_command("dancer", "q"))
+        QTimer.singleShot(100, lambda: self.send_blossom_command("dancer", "q"))
 
+    def toggle_recording(self):
+        if self.recorder_thread and self.recorder_thread.running:
+            self.stop_recording()
+        else:
+            self.start_recording()
 
     def start_recording(self):
-        if self.recorder_thread.running:
-            self.logger("Recording is already in progress.", level="warning")
-            return
-
         self.logger("Starting recording...", level="info")
+        self.recording_button.setEnabled(False)
+        self.recorder_thread = RecorderThread(output_path=f"{self.output_folder}/{self.study_id}/recording.mp4",
+                                              resolution=(self.frame_width, self.frame_height), fps=30,
+                                              mirror=self.mirror_video, logger=self.logger,
+                                              capture_thread=self.capture_thread)
+
         self.recorder_thread.start()
-        self.start_recording_button.setEnabled(False)
-        self.start_recording_button.setText("Recording...")
+        if self.recorder_thread.wait_until_ready(timeout=2):
+            self.recording_button.setText("Stop Rec.")
+            self.recording_button.setEnabled(True)
+
+
+    def stop_recording(self):
+        if not self.recorder_thread.running:
+            self.logger("Recording is already stopped.", level="warning")
+            return
+        self.logger("Stopping recording...", level="info")
+        self.recorder_thread.stop()
+        self.recorder_thread.join()
+        self.recording_button.setText("Start Rec.")
+        self.recorder_thread = None
 
     def load_logs_to_textedit(self):
         try:

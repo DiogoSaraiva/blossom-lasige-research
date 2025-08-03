@@ -11,9 +11,9 @@ from mediapipe.tasks.python.vision import (
     FaceLandmarkerResult, PoseLandmarkerResult
 )
 
-from src.logging_utils import Logger
-from mimetic.src.pose_utils import PoseUtils
 from mimetic.src.pose_buffer import PoseBuffer
+from mimetic.src.pose_utils import PoseUtils
+from src.logging_utils import Logger
 
 
 class MediaPipeThread(threading.Thread):
@@ -68,12 +68,15 @@ class MediaPipeThread(threading.Thread):
             self.logger(f"[MediaPipe] Error initializing MediaPipe models: {e}", level="critical")
             raise RuntimeError("Failed to initialize MediaPipe models") from e
 
+        self.pose_utils = PoseUtils(logger=logger)
+
     def _init_landmarkers(self, face_model, pose_model):
         base_delegate = BaseOptions.Delegate.GPU
         face_options = FaceLandmarkerOptions(
             base_options=BaseOptions(model_asset_path=face_model, delegate=base_delegate),
             running_mode=vision.RunningMode.LIVE_STREAM,
-            result_callback=self.face_callback
+            result_callback=self.face_callback,
+            output_facial_transformation_matrixes=True
         )
         self.face_landmarker = vision.FaceLandmarker.create_from_options(face_options)
         pose_options = PoseLandmarkerOptions(
@@ -210,21 +213,19 @@ class MediaPipeThread(threading.Thread):
         try:
             face_landmarks = self.latest_face.face_landmarks[0]
             pose_landmarks = self.latest_pose.pose_landmarks[0]
-            pose_utils = PoseUtils(
-                logger=self.logger,
-                facemesh_landmarks=face_landmarks,
-                pose_landmarks=pose_landmarks
-            )
+            self.pose_utils.update(face_landmarks, pose_landmarks)
 
-            pitch, roll, yaw = pose_utils.get_head_orientation()
-            # pitch = pose_utils.calculate_pitch()
-            # roll = pose_utils.calculate_roll()
-            # yaw = pose_utils.calculate_yaw()
+            matrix = self.latest_face.facial_transformation_matrixes[0].data
+            matrix_np = np.array(matrix, dtype=np.float32).reshape(4, 4)
+            pitch, roll, yaw = self.extract_data_from_matrix(data=matrix_np)
+
+            height = self.pose_utils.estimate_height()
+
             pose_data = {
                 "pitch": pitch,
                 "roll": roll,
                 "yaw": yaw,
-                "height": pose_utils.estimate_height(),
+                "height": height,
                 "timestamp_ms": timestamp_ms
             }
             self.result_buffer.add("pose_data", pose_data, timestamp_ms)
@@ -232,6 +233,14 @@ class MediaPipeThread(threading.Thread):
             self.logger(f"[MediaPipe] Error processing pose data: {e}", level="error")
             import traceback
             traceback.print_exc()
+
+    @staticmethod
+    def extract_data_from_matrix(data: np.ndarray):
+        _, _, _, _, _, _, euler_angles = cv2.decomposeProjectionMatrix(data[:3, :])
+        pitch = -euler_angles[0][0]
+        roll = -euler_angles[2][0]
+        yaw = euler_angles[1][0]
+        return pitch, roll, yaw
 
     def stop(self):
         """
