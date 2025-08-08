@@ -10,7 +10,6 @@ import select
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from src.config import HOST, DANCER_PORT
 
-####  comentario
 
 def wait_for_server_ready(port, timeout=10.0, interval=0.5):
     url = f"http://{HOST}:{port}/"
