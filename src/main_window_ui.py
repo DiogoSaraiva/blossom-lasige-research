@@ -12,12 +12,26 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
+        MainWindow.setEnabled(True)
         MainWindow.resize(800, 600)
         MainWindow.setLocale(QtCore.QLocale(QtCore.QLocale.Language.English, QtCore.QLocale.Country.UnitedStates))
         self.central_widget = QtWidgets.QWidget(parent=MainWindow)
         self.central_widget.setObjectName("central_widget")
         self.gridLayout = QtWidgets.QGridLayout(self.central_widget)
         self.gridLayout.setObjectName("gridLayout")
+        self.recording_button = QtWidgets.QPushButton(parent=self.central_widget)
+        self.recording_button.setLocale(QtCore.QLocale(QtCore.QLocale.Language.English, QtCore.QLocale.Country.UnitedStates))
+        self.recording_button.setObjectName("recording_button")
+        self.gridLayout.addWidget(self.recording_button, 0, 4, 1, 1)
+        self.mimetic_button = QtWidgets.QPushButton(parent=self.central_widget)
+        self.mimetic_button.setObjectName("mimetic_button")
+        self.gridLayout.addWidget(self.mimetic_button, 5, 1, 1, 2)
+        self.reset_dancer = QtWidgets.QPushButton(parent=self.central_widget)
+        self.reset_dancer.setObjectName("reset_dancer")
+        self.gridLayout.addWidget(self.reset_dancer, 6, 3, 1, 2)
+        self.calibrate_pose_button = QtWidgets.QPushButton(parent=self.central_widget)
+        self.calibrate_pose_button.setObjectName("calibrate_pose_button")
+        self.gridLayout.addWidget(self.calibrate_pose_button, 0, 3, 1, 1)
         self.cam_feed = QtWidgets.QLabel(parent=self.central_widget)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
         sizePolicy.setHorizontalStretch(0)
@@ -33,15 +47,29 @@ class Ui_MainWindow(object):
         self.cam_feed.setScaledContents(False)
         self.cam_feed.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self.cam_feed.setObjectName("cam_feed")
-        self.gridLayout.addWidget(self.cam_feed, 0, 0, 5, 1)
-        self.mimetic_button = QtWidgets.QPushButton(parent=self.central_widget)
-        self.mimetic_button.setObjectName("mimetic_button")
-        self.gridLayout.addWidget(self.mimetic_button, 3, 1, 1, 2)
-        self.reset_dancer = QtWidgets.QPushButton(parent=self.central_widget)
-        self.reset_dancer.setObjectName("reset_dancer")
-        self.gridLayout.addWidget(self.reset_dancer, 4, 3, 1, 2)
+        self.gridLayout.addWidget(self.cam_feed, 0, 0, 7, 1)
+        self.dancer_button = QtWidgets.QPushButton(parent=self.central_widget)
+        self.dancer_button.setObjectName("dancer_button")
+        self.gridLayout.addWidget(self.dancer_button, 5, 3, 1, 2)
+        self.terminal_output = QtWidgets.QTextEdit(parent=self.central_widget)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.terminal_output.sizePolicy().hasHeightForWidth())
+        self.terminal_output.setSizePolicy(sizePolicy)
+        self.terminal_output.setMaximumSize(QtCore.QSize(3840, 300))
+        self.terminal_output.setStyleSheet("font-family: monospace;\n"
+"font-size: 13px;\n"
+"border: 1px solid #444;\n"
+"background-color: rgb(60, 60, 60);\n"
+"color: #d4d4d4;\n"
+"padding: 4px;")
+        self.terminal_output.setReadOnly(True)
+        self.terminal_output.setObjectName("terminal_output")
+        self.gridLayout.addWidget(self.terminal_output, 7, 0, 1, 5)
         self.blossom_data = QtWidgets.QGroupBox(parent=self.central_widget)
         self.blossom_data.setMinimumSize(QtCore.QSize(360, 80))
+        self.blossom_data.setMaximumSize(QtCore.QSize(16777215, 100))
         self.blossom_data.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self.blossom_data.setObjectName("blossom_data")
         self.blossom_pitch_title = QtWidgets.QLabel(parent=self.blossom_data)
@@ -102,9 +130,14 @@ class Ui_MainWindow(object):
         self.gridLayout.addWidget(self.blossom_data, 2, 1, 1, 4)
         self.reset_mimetic = QtWidgets.QPushButton(parent=self.central_widget)
         self.reset_mimetic.setObjectName("reset_mimetic")
-        self.gridLayout.addWidget(self.reset_mimetic, 4, 1, 1, 2)
+        self.gridLayout.addWidget(self.reset_mimetic, 6, 1, 1, 2)
+        self.pose_button = QtWidgets.QPushButton(parent=self.central_widget)
+        self.pose_button.setLocale(QtCore.QLocale(QtCore.QLocale.Language.English, QtCore.QLocale.Country.UnitedStates))
+        self.pose_button.setObjectName("pose_button")
+        self.gridLayout.addWidget(self.pose_button, 0, 1, 1, 2)
         self.pose_data = QtWidgets.QGroupBox(parent=self.central_widget)
         self.pose_data.setMinimumSize(QtCore.QSize(360, 80))
+        self.pose_data.setMaximumSize(QtCore.QSize(16777215, 100))
         self.pose_data.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self.pose_data.setObjectName("pose_data")
         self.pose_pitch_title = QtWidgets.QLabel(parent=self.pose_data)
@@ -180,36 +213,89 @@ class Ui_MainWindow(object):
         self.data_sent.setChecked(False)
         self.data_sent.setObjectName("data_sent")
         self.gridLayout.addWidget(self.pose_data, 1, 1, 1, 4)
-        self.recording_button = QtWidgets.QPushButton(parent=self.central_widget)
-        self.recording_button.setLocale(QtCore.QLocale(QtCore.QLocale.Language.English, QtCore.QLocale.Country.UnitedStates))
-        self.recording_button.setObjectName("recording_button")
-        self.gridLayout.addWidget(self.recording_button, 0, 4, 1, 1)
-        self.dancer_button = QtWidgets.QPushButton(parent=self.central_widget)
-        self.dancer_button.setObjectName("dancer_button")
-        self.gridLayout.addWidget(self.dancer_button, 3, 3, 1, 2)
-        self.pose_button = QtWidgets.QPushButton(parent=self.central_widget)
-        self.pose_button.setLocale(QtCore.QLocale(QtCore.QLocale.Language.English, QtCore.QLocale.Country.UnitedStates))
-        self.pose_button.setObjectName("pose_button")
-        self.gridLayout.addWidget(self.pose_button, 0, 1, 1, 2)
-        self.calibrate_pose_button = QtWidgets.QPushButton(parent=self.central_widget)
-        self.calibrate_pose_button.setObjectName("calibrate_pose_button")
-        self.gridLayout.addWidget(self.calibrate_pose_button, 0, 3, 1, 1)
-        self.terminal_output = QtWidgets.QTextEdit(parent=self.central_widget)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.terminal_output.sizePolicy().hasHeightForWidth())
-        self.terminal_output.setSizePolicy(sizePolicy)
-        self.terminal_output.setMaximumSize(QtCore.QSize(3840, 300))
-        self.terminal_output.setStyleSheet("font-family: monospace;\n"
-"font-size: 13px;\n"
-"border: 1px solid #444;\n"
-"background-color: rgb(60, 60, 60);\n"
-"color: #d4d4d4;\n"
-"padding: 4px;")
-        self.terminal_output.setReadOnly(True)
-        self.terminal_output.setObjectName("terminal_output")
-        self.gridLayout.addWidget(self.terminal_output, 5, 0, 1, 5)
+        self.groupBox = QtWidgets.QGroupBox(parent=self.central_widget)
+        self.groupBox.setMinimumSize(QtCore.QSize(170, 80))
+        self.groupBox.setMaximumSize(QtCore.QSize(170, 80))
+        self.groupBox.setObjectName("groupBox")
+        self.left_indicator = QtWidgets.QCheckBox(parent=self.groupBox)
+        self.left_indicator.setEnabled(False)
+        self.left_indicator.setGeometry(QtCore.QRect(20, 50, 25, 25))
+        self.left_indicator.setMinimumSize(QtCore.QSize(25, 25))
+        self.left_indicator.setMaximumSize(QtCore.QSize(25, 25))
+        self.left_indicator.setStyleSheet("QCheckBox::indicator {\n"
+"    width: 20px;\n"
+"    height: 20px;\n"
+"    border-radius: 3px;\n"
+"    border: 1px solid #444;\n"
+"}\n"
+"QCheckBox::indicator:checked {\n"
+"    background-color: red;\n"
+"}\n"
+"QCheckBox::indicator:unchecked {\n"
+"    background-color: rgb(192, 191, 188);\n"
+"}")
+        self.left_indicator.setCheckable(True)
+        self.left_indicator.setChecked(False)
+        self.left_indicator.setObjectName("left_indicator")
+        self.center_indicator = QtWidgets.QCheckBox(parent=self.groupBox)
+        self.center_indicator.setEnabled(False)
+        self.center_indicator.setGeometry(QtCore.QRect(70, 50, 25, 25))
+        self.center_indicator.setMinimumSize(QtCore.QSize(25, 25))
+        self.center_indicator.setMaximumSize(QtCore.QSize(25, 25))
+        self.center_indicator.setStyleSheet("QCheckBox::indicator {\n"
+"    width: 20px;\n"
+"    height: 20px;\n"
+"    border-radius: 3px;\n"
+"    border: 1px solid #444;\n"
+"}\n"
+"QCheckBox::indicator:checked {\n"
+"    background-color: red;\n"
+"}\n"
+"QCheckBox::indicator:unchecked {\n"
+"    background-color: rgb(192, 191, 188);\n"
+"}")
+        self.center_indicator.setCheckable(True)
+        self.center_indicator.setChecked(False)
+        self.center_indicator.setObjectName("center_indicator")
+        self.right_indicator = QtWidgets.QCheckBox(parent=self.groupBox)
+        self.right_indicator.setEnabled(False)
+        self.right_indicator.setGeometry(QtCore.QRect(120, 50, 25, 25))
+        self.right_indicator.setMinimumSize(QtCore.QSize(25, 25))
+        self.right_indicator.setMaximumSize(QtCore.QSize(25, 25))
+        self.right_indicator.setStyleSheet("QCheckBox::indicator {\n"
+"    width: 20px;\n"
+"    height: 20px;\n"
+"    border-radius: 3px;\n"
+"    border: 1px solid #444;\n"
+"}\n"
+"QCheckBox::indicator:checked {\n"
+"    background-color: red;\n"
+"}\n"
+"QCheckBox::indicator:unchecked {\n"
+"    background-color: rgb(192, 191, 188);\n"
+"}")
+        self.right_indicator.setCheckable(True)
+        self.right_indicator.setChecked(False)
+        self.right_indicator.setObjectName("right_indicator")
+        self.left = QtWidgets.QLabel(parent=self.groupBox)
+        self.left.setGeometry(QtCore.QRect(10, 30, 40, 19))
+        self.left.setMinimumSize(QtCore.QSize(40, 0))
+        self.left.setMaximumSize(QtCore.QSize(40, 16777215))
+        self.left.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.left.setObjectName("left")
+        self.center = QtWidgets.QLabel(parent=self.groupBox)
+        self.center.setGeometry(QtCore.QRect(50, 30, 60, 19))
+        self.center.setMinimumSize(QtCore.QSize(60, 0))
+        self.center.setMaximumSize(QtCore.QSize(50, 16777215))
+        self.center.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.center.setObjectName("center")
+        self.right = QtWidgets.QLabel(parent=self.groupBox)
+        self.right.setGeometry(QtCore.QRect(110, 30, 40, 19))
+        self.right.setMinimumSize(QtCore.QSize(40, 0))
+        self.right.setMaximumSize(QtCore.QSize(40, 16777215))
+        self.right.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.right.setObjectName("right")
+        self.gridLayout.addWidget(self.groupBox, 3, 1, 1, 1)
         MainWindow.setCentralWidget(self.central_widget)
         self.menubar = QtWidgets.QMenuBar(parent=MainWindow)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 800, 24))
@@ -234,9 +320,13 @@ class Ui_MainWindow(object):
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
-        self.cam_feed.setText(_translate("MainWindow", "Cam Off"))
+        self.recording_button.setText(_translate("MainWindow", "Start Rec."))
         self.mimetic_button.setText(_translate("MainWindow", "Start Mimetic"))
         self.reset_dancer.setText(_translate("MainWindow", "Reset Dancer"))
+        self.calibrate_pose_button.setText(_translate("MainWindow", "Calibrate Pose"))
+        self.cam_feed.setText(_translate("MainWindow", "Cam Off"))
+        self.dancer_button.setText(_translate("MainWindow", "Start Dancer"))
+        self.terminal_output.setPlaceholderText(_translate("MainWindow", "Output log"))
         self.blossom_data.setTitle(_translate("MainWindow", "Sent Data:"))
         self.blossom_pitch_title.setText(_translate("MainWindow", "Pitch:"))
         self.blossom_pitch_value.setText(_translate("MainWindow", "--"))
@@ -249,6 +339,7 @@ class Ui_MainWindow(object):
         self.blossom_ears_title.setText(_translate("MainWindow", "Ears:"))
         self.blossom_ears_value.setText(_translate("MainWindow", "--"))
         self.reset_mimetic.setText(_translate("MainWindow", "Reset Mimetic"))
+        self.pose_button.setText(_translate("MainWindow", "Start Pose Recognition"))
         self.pose_data.setTitle(_translate("MainWindow", "Pose Data:"))
         self.pose_pitch_title.setText(_translate("MainWindow", "Pitch:"))
         self.pose_pitch_value.setText(_translate("MainWindow", "--"))
@@ -260,11 +351,13 @@ class Ui_MainWindow(object):
         self.pose_height_value.setText(_translate("MainWindow", "--"))
         self.data_sent_title.setText(_translate("MainWindow", "Sent:"))
         self.data_sent.setText(_translate("MainWindow", "CheckBox"))
-        self.recording_button.setText(_translate("MainWindow", "Start Rec."))
-        self.dancer_button.setText(_translate("MainWindow", "Start Dancer"))
-        self.pose_button.setText(_translate("MainWindow", "Start Pose Recognition"))
-        self.calibrate_pose_button.setText(_translate("MainWindow", "Calibrate Pose"))
-        self.terminal_output.setPlaceholderText(_translate("MainWindow", "Output log"))
+        self.groupBox.setTitle(_translate("MainWindow", "Gaze Tracking:"))
+        self.left_indicator.setText(_translate("MainWindow", "CheckBox"))
+        self.center_indicator.setText(_translate("MainWindow", "CheckBox"))
+        self.right_indicator.setText(_translate("MainWindow", "CheckBox"))
+        self.left.setText(_translate("MainWindow", "Left"))
+        self.center.setText(_translate("MainWindow", "Center"))
+        self.right.setText(_translate("MainWindow", "Right"))
         self.menuFile.setTitle(_translate("MainWindow", "File"))
         self.menu_settings_button.setText(_translate("MainWindow", "Settings"))
         self.menu_exit_button.setText(_translate("MainWindow", "Exit"))

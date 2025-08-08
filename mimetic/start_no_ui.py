@@ -15,9 +15,9 @@ from src.utils import compact_timestamp
 
 
 class Mimetic:
-    def __init__(self, output_folder: str, study_id: str or int, host: str, port: int, mirror_video: bool,
-                 capture_thread: FrameCaptureThread, logger: {Logger, Logger},
-                 blossom_sender: BlossomSenderThread = None):
+    def __init__(self, output_folder: str, study_id: str | int, host: str, port: int, mirror_video: bool,
+                 capture_thread: FrameCaptureThread, logger: dict[str, Logger],
+                 blossom_sender: BlossomSenderThread = None, left_threshold: float = 0.45, right_threshold: float = 0.55):
         self._stop_event = threading.Event()
         self._thread = None
         self.output_folder = output_folder or "./output"
@@ -30,11 +30,11 @@ class Mimetic:
         )
         self.host = host or get_local_ip()
         self.port = port
-        self.mirror_video = mirror_video or True
+        self.mirror_video = bool(mirror_video)
         self.capture_thread = capture_thread or FrameCaptureThread(logger=self.logger)
         self.limiter = MotionLimiter(logger=self.logger)
         self.pose_buffer = PoseBuffer(logger=self.logger)
-        self.cam_view_title = "Pose Estimation " + " (Mirrored)" if mirror_video else ""
+        self.cam_view_title = "Pose Estimation" + (" (Mirrored)" if self.mirror_video else "")
         self.running = False
         self.angle_offset = {"pitch": 0, "roll": 0, "yaw": 0}
         self.blossom_sender_thread = blossom_sender or BlossomSenderThread(host=self.host, port=self.port,
@@ -42,6 +42,9 @@ class Mimetic:
         self.mp_thread = None
         self.is_sending = False
         self.data = {}
+
+        self.left_threshold = left_threshold
+        self.right_threshold = right_threshold
 
     def _main_loop(self):
         self.running = True
@@ -123,6 +126,7 @@ class Mimetic:
                     "axis": axis,
                     "blossom_data": {"x": x, "y": y, "z": z, "h": h, "e": e},
                     "height": height,
+                    "gaze": pose_data["gaze"],
                     "fps": fps
                 }
                 if should_send:
@@ -182,8 +186,8 @@ class Mimetic:
 
         frame_height, frame_width = frame_display.shape[:2]
         self.logger(f"[INFO] Detected camera with resolution: {frame_width}x{frame_height}")
-
-        self.mp_thread = MediaPipeThread(result_buffer=self.pose_buffer, logger=self.logger)
+        self.mp_thread = MediaPipeThread(result_buffer=self.pose_buffer, logger=self.logger,
+                                         left_threshold=self.left_threshold, right_threshold=self.right_threshold)
         self.mp_thread.start()
         return frame_width, frame_height
 

@@ -1,6 +1,7 @@
 import json
 import sys
 import time
+from pathlib import Path
 
 # noinspection PyPackageRequirements
 import cv2
@@ -9,7 +10,7 @@ from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import QApplication, QMainWindow
 
 from mimetic.start_no_ui import Mimetic
-from src.config import OUTPUT_FOLDER, MIMETIC_PORT, DANCER_PORT, MIRROR_VIDEO, FLIP_BLOSSOM
+from src.config import OUTPUT_FOLDER, MIMETIC_PORT, DANCER_PORT, MIRROR_VIDEO, FLIP_BLOSSOM, RIGHT_THRESHOLD, LEFT_THRESHOLD
 from src.logging_utils import Logger
 from src.main_window_ui import Ui_MainWindow
 from src.threads.blossom_server_launcher import BlossomServerLauncher
@@ -19,10 +20,10 @@ from src.threads.mimetic_thread import MimeticRunnerThread
 from src.threads.recorder_thread import RecorderThread
 from src.utils import compact_timestamp, get_local_ip
 
-
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
         super().__init__()
+        self._last_gaze_label = None
         self.mimetic_server_process = None
         self.setupUi(self)
         self.setWindowTitle("Blossom LASIGE Research")
@@ -66,12 +67,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             logger={
                 "system": self.logger,
                 "pose": None
-            }
+            },
+            left_threshold=LEFT_THRESHOLD, right_threshold=RIGHT_THRESHOLD
         )
         self.mimetic_thread = None
         self.calib_thread = None
         self.main()
         self.recorder_thread = None
+
+        self._log_pos = 0
 
     def main(self):
         self.timer = QTimer()
@@ -166,9 +170,47 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.pose_button.setText("Start Pose Recognition")
 
     def update_mimetic_data(self, data: dict):
+        indicators = {
+
+            "left": self.left_indicator,
+
+            "center": self.center_indicator,
+
+            "right": self.right_indicator
+
+        }
+        def update_gaze_indicator(label: str = None):
+
+            self.logger(f"Updating gaze indicator: {label}", level="info")
+
+            clear_gaze_indicator()
+
+            if label in indicators:
+                indicators[label].setChecked(True)
+
+            self._last_gaze_label = label
+
+        def clear_gaze_indicator():
+            for indicator in indicators.values():
+                indicator.setChecked(False)
+            
         def format_val(val: float, suffix: str = '') -> str:
             return f"{val:.2f}{suffix}" if val is not None else "--"
 
+        gaze = data.get('gaze')
+
+        if gaze and self.mimetic.running:
+
+            gaze_label = gaze.get("label", None)
+
+            gaze_ratio = gaze.get("ratio", None)
+
+            if gaze_label != self._last_gaze_label:
+                update_gaze_indicator(gaze_label)
+        else:
+            clear_gaze_indicator()
+            self._last_gaze_label = None
+                
         axis = data.get("axis")
         if axis is not None:
             pitch, roll, yaw = axis.get("pitch"), axis.get("roll"), axis.get("yaw")
@@ -217,7 +259,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.logger(f"{blossom_type.capitalize()} Blossom server started successfully.")
                 setattr(self, proc_attr, launcher.server_proc)
 
-                # lógica extra se for o mimetic
                 if blossom_type == "mimetic":
                     self.logger("Mimetic Blossom server is ready. Starting sender thread.", level="info")
                     self.mimetic.start_sending()
@@ -282,7 +323,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
 
     def stop_recording(self):
-        if not self.recorder_thread.running:
+        if not self.recorder_thread or not self.recorder_thread.running:
             self.logger("Recording is already stopped.", level="warning")
             return
         self.logger("Stopping recording...", level="info")
@@ -292,25 +333,44 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.recorder_thread = None
 
     def load_logs_to_textedit(self):
-        try:
-            with open(self.logger.output_path, "r") as file:
-                log_data = json.load(file)
-        except Exception as e:
-            import traceback
-            self.logger(f"Failed to load logs: {e}\n" + traceback.format_exc(), level="error")
+        path = Path(self.logger.output_path)
+        if not path.exists():
             return
 
-        if self.last_log_index >= len(log_data):
+        try:
+            size = path.stat().st_size
+            if size < self._log_pos:
+                self._log_pos = 0
+
+            with open(path, "r", encoding="utf-8") as f:
+                f.seek(self._log_pos)
+                chunk = f.read()
+                self._log_pos = f.tell()
+        except Exception as e:
+            self.logger(f"Failed to read logs: {e}", level="error")
+            return
+
+        if not chunk:
+            return
+
+        lines = chunk.splitlines()
+        if not lines:
             return
 
         scrollbar = self.terminal_output.verticalScrollBar()
         at_bottom = scrollbar.value() == scrollbar.maximum()
 
-        for entry in log_data[self.last_log_index:]:
-            timestamp = entry.get("timestamp", "")
-            level = entry.get("level", "INFO").upper()
-            msg = str(entry.get("data", ""))
+        for line in lines:
+            try:
+                entry = json.loads(line)
+            except Exception:
+                continue
 
+            timestamp = entry.get("timestamp", "")
+            level = str(entry.get("level", "INFO")).upper()
+            data = entry.get("data", "")
+
+            msg = data if isinstance(data, str) else json.dumps(data, ensure_ascii=False)
             msg = msg.replace("\n", "<br>")
 
             color = {
@@ -318,7 +378,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 "WARNING": "#f1fa8c",
                 "ERROR": "#ff5555",
                 "DEBUG": "#8be9fd",
-                "CRITICAL": "#ff4444"
+                "CRITICAL": "#ff4444",
             }.get(level, "#ffffff")
 
             html_line = f'<span style="color:{color};">[{timestamp}] [{level}]</span> {msg}'
@@ -327,9 +387,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if at_bottom:
             self.terminal_output.moveCursor(self.terminal_output.textCursor().MoveOperation.End)
             self.terminal_output.ensureCursorVisible()
-
-        self.last_log_index = len(log_data)
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

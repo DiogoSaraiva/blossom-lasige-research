@@ -10,7 +10,8 @@ TARGET_FPS = 30
 OUTPUT_FOLDER = "./output"
 HOST = get_local_ip()
 FLIP_BLOSSOM = True
-
+LEFT_THRESHOLD = 0.45
+RIGHT_THRESHOLD = 0.55
 
 def url_mimetic(path: str = "") -> str:
     return f"http://{HOST}:{MIMETIC_PORT}/{path.lstrip('/')}"

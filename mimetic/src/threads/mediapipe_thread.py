@@ -15,6 +15,7 @@ from mimetic.src.pose_buffer import PoseBuffer
 from mimetic.src.pose_utils import PoseUtils
 from src.logging_utils import Logger
 
+from mimetic.src.gaze_utils import GazeEstimator
 
 class MediaPipeThread(threading.Thread):
     """
@@ -29,7 +30,7 @@ class MediaPipeThread(threading.Thread):
         max_queue (int, optional): Maximum number of frames in the processing queue.
         logger (Logger, optional): Logger instance for logging messages.
     """
-    def __init__(self, result_buffer: PoseBuffer, logger: Logger, model_dir: str = None, max_queue=8):
+    def __init__(self, result_buffer: PoseBuffer, logger: Logger, model_dir: str = None, max_queue=8, left_threshold: float = 0.45, right_threshold: float = 0.55):
         """
         Initialize the MediaPipeThread.
 
@@ -50,6 +51,8 @@ class MediaPipeThread(threading.Thread):
         self.face_valid_until = 0
         self.pose_valid_until = 0
         self.landmark_timeout_ms = 500
+
+        self.gaze_estimator = GazeEstimator(left_threshold=left_threshold, right_threshold=right_threshold)
 
         if model_dir is None:
             current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -221,12 +224,15 @@ class MediaPipeThread(threading.Thread):
 
             height = self.pose_utils.estimate_height()
 
+            gaze_label, gaze_ratio = self.gaze_estimator.update_from_landmarks(landmarks=face_landmarks)
+
             pose_data = {
                 "pitch": pitch,
                 "roll": roll,
                 "yaw": yaw,
+                "gaze": {'label': gaze_label, 'ratio': gaze_ratio, },
                 "height": height,
-                "timestamp_ms": timestamp_ms
+                "timestamp_ms": timestamp_ms,
             }
             self.result_buffer.add("pose_data", pose_data, timestamp_ms)
         except Exception as e:
