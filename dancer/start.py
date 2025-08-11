@@ -1,5 +1,8 @@
 import sys
 import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+from src.config import HOST, DANCER_PORT
 import subprocess
 import time
 import requests
@@ -7,8 +10,7 @@ import argparse
 import librosa
 import select
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from src.config import HOST, DANCER_PORT
+
 
 
 def wait_for_server_ready(port, timeout=10.0, interval=0.5):

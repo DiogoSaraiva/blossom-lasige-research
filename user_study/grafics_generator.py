@@ -2,52 +2,52 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Configuração de estilo
+# Style configuration
 sns.set(style="whitegrid")
 
-# Ler os dados
-df = pd.read_csv('populacao.csv')
+# Read the data
+df = pd.read_csv('population.csv')
 
-# 1. Gráfico de barras: distribuição das emoções
-plt.figure(figsize=(8,6))
-sns.countplot(x='emocao', data=df, palette='pastel')
-plt.title('Distribuição das Emoções')
-plt.xlabel('Emoção')
-plt.ylabel('Número de Crianças')
+# 1. Bar chart: emotion distribution
+plt.figure(figsize=(8, 6))
+sns.countplot(x='emotion', data=df, palette='pastel')
+plt.title('Emotion Distribution')
+plt.xlabel('Emotion')
+plt.ylabel('Number of Children')
 plt.tight_layout()
-#plt.savefig('grafico_barras_emocoes.png')
+# plt.savefig('bar_chart_emotions.png')
 plt.show()
 
-# 2. Gráfico de linhas: tempos vs ids
-plt.figure(figsize=(12,6))
-plt.plot(df['id'], df['tempo_frente'], label='Tempo a olhar para a frente', color='blue', marker='o')
-plt.plot(df['id'], df['tempo_lateral'], label='Tempo a olhar para o lado', color='green', marker='o')
-plt.title('Tempos a olhar vs Crianças')
-plt.xlabel('ID da Criança')
-plt.ylabel('Tempo (segundos)')
+# 2. Line chart: time vs IDs
+plt.figure(figsize=(12, 6))
+plt.plot(df['id'], df['time_front'], label='Time looking at front', color='blue', marker='o')
+plt.plot(df['id'], df['time_side'], label='Time looking at side', color='green', marker='o')
+plt.title('Looking Time vs Children')
+plt.xlabel('Child ID')
+plt.ylabel('Time (seconds)')
 plt.xticks(rotation=45)
 plt.legend()
 plt.tight_layout()
-#plt.savefig('grafico_linhas_tempos.png')
+# plt.savefig('line_chart_times.png')
 plt.show()
 
-# 3. Boxplot: número de switches
-plt.figure(figsize=(8,6))
+# 3. Boxplot: number of switches
+plt.figure(figsize=(8, 6))
 sns.boxplot(y='switches', data=df, palette='pastel')
-plt.title('Distribuição do Número de Switches')
-plt.ylabel('Número de Switches')
+plt.title('Switch Count Distribution')
+plt.ylabel('Number of Switches')
 plt.tight_layout()
-#plt.savefig('boxplot_switches.png')
+# plt.savefig('boxplot_switches.png')
 plt.show()
 
-# 4. Histograma: tempo a olhar para a frente
-plt.figure(figsize=(8,6))
-sns.histplot(df['tempo_frente'], bins=10, kde=True, color='skyblue')
-plt.title('Distribuição do Tempo a Olhar para a Frente')
-plt.xlabel('Tempo (segundos)')
-plt.ylabel('Frequência')
+# 4. Histogram: time looking at front
+plt.figure(figsize=(8, 6))
+sns.histplot(df['time_front'], bins=10, kde=True, color='skyblue')
+plt.title('Distribution of Time Looking at Front')
+plt.xlabel('Time (seconds)')
+plt.ylabel('Frequency')
 plt.tight_layout()
-#plt.savefig('histograma_tempo_frente.png')
+# plt.savefig('histogram_time_front.png')
 plt.show()
 
-print("graficos gerados com sucesso!")
+print("Charts generated successfully!")
