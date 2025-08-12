@@ -49,3 +49,4 @@ configargparse
 
 
 PyQt6~=6.9.1
+librosa
