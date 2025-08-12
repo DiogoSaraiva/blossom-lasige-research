@@ -34,9 +34,9 @@ class BlossomServerLauncher(QThread):
 
     def run(self):
         try:
-            self.logger(f"Launching blossom_public/start.py ({self.blossom_type.upper()})...")
+            self.logger(f"Launching blossom_public/mimetic.py ({self.blossom_type.upper()})...")
             self.server_proc = subprocess.Popen([
-                PYTHON, "blossom_public/start.py",
+                PYTHON, "blossom_public/mimetic.py",
                 "--host", HOST,
                 "--port", str(self.ports[self.blossom_type]),
                 "--browser-disable"

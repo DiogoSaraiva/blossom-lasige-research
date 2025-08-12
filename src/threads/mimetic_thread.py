@@ -1,5 +1,5 @@
 from PyQt6.QtCore import QThread, pyqtSignal
-from mimetic.start_no_ui import Mimetic
+from mimetic.mimetic import Mimetic
 
 class MimeticRunnerThread(QThread):
 

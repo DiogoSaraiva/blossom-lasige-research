@@ -117,7 +117,8 @@ class MediaPipeThread(threading.Thread):
             import traceback
             self.logger(f"[MediaPipe] CRASHED: {e} \n {traceback.format_exc()}", level="critical")
 
-    def _valid_queue_item(self, item):
+    @staticmethod
+    def _valid_queue_item(item):
         return item is not None and isinstance(item, tuple) and len(item) == 2
 
     def _process_frame(self, frame, timestamp):
@@ -151,7 +152,8 @@ class MediaPipeThread(threading.Thread):
             import traceback
             traceback.print_exc()
 
-    def face_callback(self, result: FaceLandmarkerResult, output_image: mp.Image, timestamp_ms: int):
+    # noinspection PyUnusedLocal
+    def face_callback(self, result: FaceLandmarkerResult, output_image: mp.Image , timestamp_ms: int):
         """
         Callback function for face landmark detection.
 
@@ -175,6 +177,7 @@ class MediaPipeThread(threading.Thread):
             import traceback
             traceback.print_exc()
 
+    # noinspection PyUnusedLocal
     def pose_callback(self, result: PoseLandmarkerResult, output_image: mp.Image, timestamp_ms: int):
         """
         Callback function for pose landmark detection.

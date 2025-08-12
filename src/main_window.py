@@ -9,7 +9,7 @@ from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import QApplication, QMainWindow
 
-from mimetic.start_no_ui import Mimetic
+from mimetic.mimetic import Mimetic
 from src.config import OUTPUT_FOLDER, MIMETIC_PORT, DANCER_PORT, MIRROR_VIDEO, FLIP_BLOSSOM, RIGHT_THRESHOLD, LEFT_THRESHOLD
 from src.logging_utils import Logger
 from src.main_window_ui import Ui_MainWindow
@@ -180,8 +180,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         }
         def update_gaze_indicator(label: str = None):
-
-            self.logger(f"Updating gaze indicator: {label}", level="info")
 
             clear_gaze_indicator()
 
