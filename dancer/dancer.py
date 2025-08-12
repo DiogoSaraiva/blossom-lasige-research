@@ -1,5 +1,8 @@
-import sys
+import sys, librosa
 import os
+
+from sympy import false
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 from src.config import HOST, DANCER_PORT
@@ -107,3 +110,15 @@ if __name__ == "__main__":
         print("[INFO] Shutting down DANCER server...")
         dancer_server_proc.terminate()
         dancer_server_proc.wait()
+
+
+class Dancer:
+
+    def __init__(self):
+        self.running = False
+
+    def start(self):
+        self.running = True
+
+    def stop(self):
+        self.running = False

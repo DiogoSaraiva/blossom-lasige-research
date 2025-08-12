@@ -9,6 +9,8 @@ from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import QApplication, QMainWindow
 
+from dancer import dancer
+from dancer.dancer import Dancer
 from mimetic.mimetic import Mimetic
 from src.config import OUTPUT_FOLDER, MIMETIC_PORT, DANCER_PORT, MIRROR_VIDEO, FLIP_BLOSSOM, RIGHT_THRESHOLD, LEFT_THRESHOLD
 from src.logging_utils import Logger
@@ -77,6 +79,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self._log_pos = 0
 
+        self.dancer = Dancer()
+        self.dancing = False
+
     def main(self):
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_video_frame) # type: ignore
@@ -89,7 +94,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.recording_button.clicked.connect(self.toggle_recording)
         self.mimetic_button.clicked.connect(self.start_mimetic_blossom)
         self.reset_mimetic.clicked.connect(self.reset_mimetic_blossom)
-        self.dancer_button.clicked.connect(self.start_dancer_blossom)
+        self.dancer_button.clicked.connect(self.toggle_dancer)
         self.reset_dancer.clicked.connect(self.reset_dancer_blossom)
 
     def update_video_frame(self):
@@ -293,13 +298,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         else:
             self.logger("Mimetic is already stopped.", level="warning")
 
-    def start_dancer_blossom(self):
-        self.launch_blossom("dancer")
-
-    def reset_dancer_blossom(self):
-        self.send_blossom_command("dancer", "reset")
-        QTimer.singleShot(100, lambda: self.send_blossom_command("dancer", "q"))
-
     def toggle_recording(self):
         if self.recorder_thread and self.recorder_thread.running:
             self.stop_recording()
@@ -386,8 +384,32 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.terminal_output.moveCursor(self.terminal_output.textCursor().MoveOperation.End)
             self.terminal_output.ensureCursorVisible()
 
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
-    sys.exit(app.exec())
+    def toggle_dancer(self):
+        if self.dancing:
+            self.stop_dancer()
+        else:
+            self.start_dancer()
+
+    def start_dancer(self):
+        self.logger("Starting dancer...", level="info")
+        QTimer.singleShot(100, lambda:  self.start_dancer_blossom())
+        self.dancer.start()
+        self.dancing = True
+        self.dancer_button.setText("Stop Dancer")
+
+    def stop_dancer(self):
+        if not self.dancer.running:
+            self.logger("Dancer already stopped", level="warning")
+            return
+        self.logger("Stopping Dancer...", level="info")
+
+        self.dancer.stop()
+        self.dancing = False
+        self.dancer_button.setText("Start Dancer")
+
+    def start_dancer_blossom(self):
+        self.launch_blossom("dancer")
+
+    def reset_dancer_blossom(self):
+        self.send_blossom_command("dancer", "reset")
+        QTimer.singleShot(100, lambda: self.send_blossom_command("dancer", "q"))
