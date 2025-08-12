@@ -5,6 +5,8 @@ ports = ['/dev/ttyACM0']
 baudrates = [1000000, 57600, 115200]
 protocols = ['Dxl320IO', 'DxlIO']
 
+
+
 for port in ports:
     for br in baudrates:
         for proto in protocols:
