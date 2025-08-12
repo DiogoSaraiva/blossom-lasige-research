@@ -2,7 +2,7 @@ import cv2
 import mediapipe as mp
 import numpy as np
 
-from mimetic.src.logging_utils import Logger
+from src.logging_utils import Logger
 
 mp_drawing = mp.solutions.drawing_utils
 

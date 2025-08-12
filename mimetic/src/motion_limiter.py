@@ -1,7 +1,7 @@
 import time
 import numpy as np
 
-from mimetic.src.logging_utils import Logger
+from src.logging_utils import Logger
 
 class MotionLimiter:
     """

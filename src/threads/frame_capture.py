@@ -1,7 +1,8 @@
 import threading
+# noinspection PyPackageRequirements
 import cv2
 
-from mimetic.src.logging_utils import Logger
+from src.logging_utils import Logger
 
 class FrameCaptureThread(threading.Thread):
     """
@@ -33,7 +34,7 @@ class FrameCaptureThread(threading.Thread):
         self.logger = logger
         self.cap = cv2.VideoCapture(cam_index)
         if not self.cap.isOpened():
-            self.logger("[ERROR] Camera failed to open.", level="error")
+            self.logger("[CaptureThread] Camera failed to open.", level="error")
             raise RuntimeError("Failed to open camera")
         for width, height in resolutions:
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)

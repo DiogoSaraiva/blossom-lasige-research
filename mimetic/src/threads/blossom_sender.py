@@ -3,7 +3,7 @@ import time
 import requests
 from queue import Queue, Empty, Full
 
-from mimetic.src.logging_utils import Logger
+from src.logging_utils import Logger
 
 class BlossomSenderThread(threading.Thread):
     """
@@ -69,9 +69,8 @@ class BlossomSenderThread(threading.Thread):
                 except Empty:
                     continue
         except Exception as e:
-            self.logger(f"[BlossomSenderThread] CRASHED: {e}", level="critical")
             import traceback
-            traceback.print_exc()
+            self.logger(f"[BlossomSenderThread] CRASHED: {e} \n {traceback.format_exc()}", level="critical")
 
     def send(self, payload: dict):
         """

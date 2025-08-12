@@ -11,10 +11,11 @@ from mediapipe.tasks.python.vision import (
     FaceLandmarkerResult, PoseLandmarkerResult
 )
 
-from mimetic.src.logging_utils import Logger
+from mimetic.src.pose_buffer import PoseBuffer
 from mimetic.src.pose_utils import PoseUtils
-from mimetic.src.stream_buffer import ResultBuffer
+from src.logging_utils import Logger
 
+from mimetic.src.gaze_utils import GazeEstimator
 
 class MediaPipeThread(threading.Thread):
     """
@@ -24,17 +25,17 @@ class MediaPipeThread(threading.Thread):
     in real-time from video frames. It runs asynchronously and processes frames from a queue.
 
     Args:
-        result_buffer (ResultBuffer): Buffer to store processed pose data.
+        result_buffer (PoseBuffer): Buffer to store processed pose data.
         model_dir (str, optional): Directory containing MediaPipe model files.
         max_queue (int, optional): Maximum number of frames in the processing queue.
         logger (Logger, optional): Logger instance for logging messages.
     """
-    def __init__(self, result_buffer: ResultBuffer, logger: Logger, model_dir: str = None, max_queue=8):
+    def __init__(self, result_buffer: PoseBuffer, logger: Logger, model_dir: str = None, max_queue=8, left_threshold: float = 0.45, right_threshold: float = 0.55):
         """
         Initialize the MediaPipeThread.
 
         Args:
-            result_buffer (ResultBuffer): Buffer to store processed pose data.
+            result_buffer (PoseBuffer): Buffer to store processed pose data.
             model_dir (str, optional): Directory containing MediaPipe model files.
             max_queue (int, optional): Maximum number of frames in the processing queue.
             logger (Logger): Logger instance for logging messages.
@@ -50,6 +51,8 @@ class MediaPipeThread(threading.Thread):
         self.face_valid_until = 0
         self.pose_valid_until = 0
         self.landmark_timeout_ms = 500
+
+        self.gaze_estimator = GazeEstimator(left_threshold=left_threshold, right_threshold=right_threshold)
 
         if model_dir is None:
             current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -68,12 +71,15 @@ class MediaPipeThread(threading.Thread):
             self.logger(f"[MediaPipe] Error initializing MediaPipe models: {e}", level="critical")
             raise RuntimeError("Failed to initialize MediaPipe models") from e
 
+        self.pose_utils = PoseUtils(logger=logger)
+
     def _init_landmarkers(self, face_model, pose_model):
         base_delegate = BaseOptions.Delegate.GPU
         face_options = FaceLandmarkerOptions(
             base_options=BaseOptions(model_asset_path=face_model, delegate=base_delegate),
             running_mode=vision.RunningMode.LIVE_STREAM,
-            result_callback=self.face_callback
+            result_callback=self.face_callback,
+            output_facial_transformation_matrixes=True
         )
         self.face_landmarker = vision.FaceLandmarker.create_from_options(face_options)
         pose_options = PoseLandmarkerOptions(
@@ -108,16 +114,16 @@ class MediaPipeThread(threading.Thread):
                 except Exception as e:
                     self.logger(f"[MediaPipe] Frame processing error: {e}", level="debug")
         except Exception as e:
-            self.logger(f"[MediaPipe] CRASHED: {e}", level="critical")
             import traceback
-            traceback.print_exc()
+            self.logger(f"[MediaPipe] CRASHED: {e} \n {traceback.format_exc()}", level="critical")
 
-    def _valid_queue_item(self, item):
+    @staticmethod
+    def _valid_queue_item(item):
         return item is not None and isinstance(item, tuple) and len(item) == 2
 
     def _process_frame(self, frame, timestamp):
         if not isinstance(frame, np.ndarray):
-            self.logger("[MediaPipe] Invalid frame")
+            self.logger("[MediaPipe] Invalid frame", level="Warning")
             return
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame)
         self.face_landmarker.detect_async(mp_image, timestamp)
@@ -146,7 +152,8 @@ class MediaPipeThread(threading.Thread):
             import traceback
             traceback.print_exc()
 
-    def face_callback(self, result: FaceLandmarkerResult, output_image: mp.Image, timestamp_ms: int):
+    # noinspection PyUnusedLocal
+    def face_callback(self, result: FaceLandmarkerResult, output_image: mp.Image , timestamp_ms: int):
         """
         Callback function for face landmark detection.
 
@@ -170,6 +177,7 @@ class MediaPipeThread(threading.Thread):
             import traceback
             traceback.print_exc()
 
+    # noinspection PyUnusedLocal
     def pose_callback(self, result: PoseLandmarkerResult, output_image: mp.Image, timestamp_ms: int):
         """
         Callback function for pose landmark detection.
@@ -211,23 +219,37 @@ class MediaPipeThread(threading.Thread):
         try:
             face_landmarks = self.latest_face.face_landmarks[0]
             pose_landmarks = self.latest_pose.pose_landmarks[0]
-            pose_utils = PoseUtils(
-                logger=self.logger,
-                facemesh_landmarks=face_landmarks,
-                pose_landmarks=pose_landmarks
-            )
+            self.pose_utils.update(face_landmarks, pose_landmarks)
+
+            matrix = self.latest_face.facial_transformation_matrixes[0].data
+            matrix_np = np.array(matrix, dtype=np.float32).reshape(4, 4)
+            pitch, roll, yaw = self.extract_data_from_matrix(data=matrix_np)
+
+            height = self.pose_utils.estimate_height()
+
+            gaze_label, gaze_ratio = self.gaze_estimator.update_from_landmarks(landmarks=face_landmarks)
+
             pose_data = {
-                "pitch": pose_utils.calculate_pitch(),
-                "roll": pose_utils.calculate_roll(),
-                "yaw": pose_utils.calculate_yaw(),
-                "height": pose_utils.estimate_height(),
-                "timestamp_ms": timestamp_ms
+                "pitch": pitch,
+                "roll": roll,
+                "yaw": yaw,
+                "gaze": {'label': gaze_label, 'ratio': gaze_ratio, },
+                "height": height,
+                "timestamp_ms": timestamp_ms,
             }
             self.result_buffer.add("pose_data", pose_data, timestamp_ms)
         except Exception as e:
             self.logger(f"[MediaPipe] Error processing pose data: {e}", level="error")
             import traceback
             traceback.print_exc()
+
+    @staticmethod
+    def extract_data_from_matrix(data: np.ndarray):
+        _, _, _, _, _, _, euler_angles = cv2.decomposeProjectionMatrix(data[:3, :])
+        pitch = -euler_angles[0][0]
+        roll = -euler_angles[2][0]
+        yaw = euler_angles[1][0]
+        return pitch, roll, yaw
 
     def stop(self):
         """
