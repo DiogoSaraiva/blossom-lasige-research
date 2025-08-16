@@ -8,25 +8,25 @@ from mimetic.src.motion_limiter import MotionLimiter
 from mimetic.src.pose_buffer import PoseBuffer
 from mimetic.src.threads.blossom_sender import BlossomSenderThread
 from mimetic.src.threads.mediapipe_thread import MediaPipeThread
-from src.config import get_local_ip
+from src.utils import get_local_ip
 from src.logging_utils import Logger, print_logger
 from src.threads.frame_capture import FrameCaptureThread
 from src.utils import compact_timestamp
 
 
 class Mimetic:
-    def __init__(self, output_folder: str, study_id: str | int, host: str, port: int, mirror_video: bool,
+    def __init__(self, output_directory: str, study_id: str | int, host: str, port: int, mirror_video: bool,
                  capture_thread: FrameCaptureThread, logger: dict[str, Logger],
                  blossom_sender: BlossomSenderThread = None, left_threshold: float = 0.45, right_threshold: float = 0.55):
         self._stop_event = threading.Event()
         self._thread = None
-        self.output_folder = output_folder or "./output"
+        self.output_directory = output_directory or "./output"
         self.study_id = study_id or compact_timestamp()
         self.logger = logger.get("system") if logger and logger.get("system") is not None else print_logger
         self.pose_logger = (
             logger.get("pose")
             if logger and logger.get("pose") is not None
-            else Logger(f"{output_folder}/{self.study_id}/pose_log.json", mode="pose")
+            else Logger(f"{output_directory}/{self.study_id}/pose_log.json", mode="pose")
         )
         self.host = host or get_local_ip()
         self.port = port
@@ -70,7 +70,7 @@ class Mimetic:
                 pose_data, _ = self.pose_buffer.get_latest_pose_data()
 
                 if pose_data is None:
-                    self.logger("[Main] No pose data received yet", level="debug")
+                    self.logger("[Mimetic] No pose data received yet", level="debug")
                     time.sleep(0.01)
                     continue
 
@@ -152,6 +152,16 @@ class Mimetic:
         finally:
             self.running = False
 
+    def update_threshold(self, left_threshold, right_threshold):
+        self.left_threshold, self.right_threshold = left_threshold, right_threshold
+        if self.running:
+            self.mp_thread = MediaPipeThread(result_buffer=self.pose_buffer, logger=self.logger,
+                                         left_threshold=self.left_threshold, right_threshold=self.right_threshold)
+    def update_output_directory(self, directory):
+        #self.running = False
+        self.output_directory = directory
+        self.pose_logger = Logger(f"{directory}/{self.study_id}/pose_log.json", mode="pose")
+        #self.running = True
 
     def start_sending(self):
         if self.is_sending:
