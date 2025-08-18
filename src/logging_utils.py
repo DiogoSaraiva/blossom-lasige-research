@@ -67,6 +67,8 @@ class Logger:
         }
         self._append_entry(entry)
 
+
+
     def __call__(self, message: str | dict, level: str = None):
         if self.log == self._log_system:
             self._log_system(message, level=(level or self.log_level))

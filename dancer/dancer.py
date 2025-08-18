@@ -1,10 +1,10 @@
-import sys
 import os
 import subprocess
 import time
-import requests
+
 import librosa
-import select
+import numpy as np
+import requests
 
 from src.logging_utils import Logger
 
@@ -12,7 +12,7 @@ from src.logging_utils import Logger
 class Dancer:
     def __init__(self, host: str, port: int, music_dir: str, logger: Logger, analysis_interval: float = 5):
         """
-        :param music_path: Path to the music file
+        :param music_dir: Path to the music directory
         :param analysis_interval: Interval in seconds to re-analyze mood
         """
         self.music_dir = music_dir
@@ -27,7 +27,7 @@ class Dancer:
     def wait_for_server_ready(self, port, timeout=10.0, interval=0.5):
         """Wait for the Blossom/Dancer server to be ready."""
         url = f"http://{self.host}:{self.port}/"
-        self.logger(f"[INFO] Waiting for Blossom server at {url}...", level="info")
+        self.logger(f"[Dancer] Waiting for Blossom server at {url}...", level="info")
         start_time = time.time()
         while time.time() - start_time < timeout:
             try:
@@ -45,10 +45,11 @@ class Dancer:
         """Analyze a segment of the music starting at `offset` for `duration` seconds."""
         y, sr = librosa.load(music_path, offset=offset, duration=duration)
         tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-        energy = sum(abs(y)) / len(y)
-
-        print(f"[INFO] Segment @ {offset:.1f}s - BPM: {tempo:.2f}, Energy: {energy:.4f}")
-        return 'happy' if tempo > 100 and energy > 0.1 else 'sad'
+        energy = float(np.sum(np.abs(y)) / y.size)
+        tempo_scalar = float(tempo) if isinstance(tempo, np.ndarray) else tempo
+        energy_scalar = float(np.sum(np.abs(y)) / y.size)
+        print(f"[INFO] Segment @ {offset:.1f}s - BPM: {tempo_scalar:.2f}, Energy: {energy_scalar:.4f}")
+        return 'happy' if tempo_scalar > 100 and energy_scalar > 0.1 else 'sad'
 
     def send_sequence(self, sequence_str):
         """Send sequence to the Dancer server."""
@@ -65,6 +66,7 @@ class Dancer:
                 return False
         except requests.exceptions.RequestException as e:
             self.logger(f"[ERROR] Failed to send sequence '{sequence_str}': {e}", level="error")
+
             return False
 
     def start(self):
@@ -80,7 +82,7 @@ class Dancer:
         try:
             self.wait_for_server_ready(self.port)
         except Exception as e:
-            self.logger(f"[ERROR] Failed to start DANCER server: {e}", level="critical")
+            self.logger(f"[Dancer] Failed to start DANCER server: {e}", level="critical")
         finally:
             self.stop()
 
@@ -95,12 +97,12 @@ class Dancer:
         """Stop the dancer and shut down the server."""
         self.is_running = False
         if self.dancer_server_proc:
-            self.logger("[INFO] Shutting down DANCER server...", level="info")
+            self.logger("[Dancer] Shutting down DANCER server...", level="info")
             self.dancer_server_proc.terminate()
             self.dancer_server_proc.wait()
 
     def analyse_music(self, music_path: str):
-        music_duration = librosa.get_duration(filename=music_path)
+        music_duration = librosa.get_duration(path=music_path)
         offset = 0
 
         try:
@@ -115,7 +117,6 @@ class Dancer:
                 time.sleep(self.analysis_interval)
 
         except KeyboardInterrupt:
-            self.logger("\n[INFO] Interrupted manually.", level="warning")
+            self.logger("\n[Dancer] Interrupted manually.", level="warning")
         finally:
             self.stop()
-
