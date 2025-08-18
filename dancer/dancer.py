@@ -5,45 +5,45 @@ import time
 import requests
 import librosa
 import select
-import argparse
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
-from src.config import HOST, DANCER_PORT
+from src.logging_utils import Logger
 
 
 class Dancer:
-    def __init__(self, music_path, analysis_interval=5):
+    def __init__(self, host: str, port: int, music_dir: str, logger: Logger, analysis_interval: float = 5):
         """
         :param music_path: Path to the music file
         :param analysis_interval: Interval in seconds to re-analyze mood
         """
-        self.music_path = music_path
+        self.music_dir = music_dir
         self.analysis_interval = analysis_interval
         self.dancer_server_proc = None
         self.current_mood = None
         self.is_running = False
+        self.host = host
+        self.port = port
+        self.logger = logger
 
     def wait_for_server_ready(self, port, timeout=10.0, interval=0.5):
         """Wait for the Blossom/Dancer server to be ready."""
-        url = f"http://{HOST}:{port}/"
-        print(f"[INFO] Waiting for Blossom server at {url}...")
+        url = f"http://{self.host}:{self.port}/"
+        self.logger(f"[INFO] Waiting for Blossom server at {url}...", level="info")
         start_time = time.time()
         while time.time() - start_time < timeout:
             try:
                 r = requests.get(url)
                 if r.status_code == 200:
-                    print(f"[INFO] Blossom server on port {port} is ready.")
+                    self.logger(f"[INFO] Blossom server on port {port} is ready.", level="debug")
                     return True
-            except requests.exceptions.RequestException:
-                pass
+            except requests.exceptions.RequestException as e:
+                self.logger(f"[ERROR] Blossom server on port {port} is not ready: {e}", level="warning")
             time.sleep(interval)
-        print(f"[ERROR] Timeout: Blossom server on port {port} not responding.")
+        self.logger(f"[ERROR] Timeout: Blossom server on port {port} not responding.", level="error")
         return False
 
-    def analyze_music_segment(self, offset, duration):
+    def analyze_music_segment(self, music_path, offset, duration):
         """Analyze a segment of the music starting at `offset` for `duration` seconds."""
-        y, sr = librosa.load(self.music_path, offset=offset, duration=duration)
+        y, sr = librosa.load(music_path, offset=offset, duration=duration)
         tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
         energy = sum(abs(y)) / len(y)
 
@@ -52,19 +52,19 @@ class Dancer:
 
     def send_sequence(self, sequence_str):
         """Send sequence to the Dancer server."""
-        url = f"http://{HOST}:{DANCER_PORT}/sequence"
+        url = f"http://{self.host}:{self.host}/sequence"
         print(f"[INFO] Sending sequence to {url}: {sequence_str}")
 
         try:
             response = requests.post(url, data=sequence_str)
             if response.status_code == 200:
-                print("[SUCCESS] Sequence sent successfully!")
+                self.logger(f"[Dancer] Sequence '{sequence_str}' sent successfully!", level="debug")
                 return True
             else:
-                print(f"[ERROR] Received status code {response.status_code}")
+                self.logger(f"[Dancer] Received status code {response.status_code}", level="error")
                 return False
         except requests.exceptions.RequestException as e:
-            print(f"[ERROR] Failed to send sequence: {e}")
+            self.logger(f"[ERROR] Failed to send sequence '{sequence_str}': {e}", level="error")
             return False
 
     def start(self):
@@ -72,24 +72,40 @@ class Dancer:
         print("[INFO] Launching DANCER server...")
         self.dancer_server_proc = subprocess.Popen([
             "python3", "blossom_public/start.py",
-            "--host", HOST,
-            "--port", str(DANCER_PORT),
+            "--host", self.host,
+            "--port", str(self.port),
             "--browser-disable"
         ])
 
-        if not self.wait_for_server_ready(DANCER_PORT):
+        try:
+            self.wait_for_server_ready(self.port)
+        except Exception as e:
+            self.logger(f"[ERROR] Failed to start DANCER server: {e}", level="critical")
+        finally:
             self.stop()
-            sys.exit("[ERROR] DANCER server failed to start.")
+
 
         self.is_running = True
-        music_duration = librosa.get_duration(filename=self.music_path)
-        offset = 0
+        for music_file in os.listdir(self.music_dir):
+            music_file = os.path.join(self.music_dir, music_file)
+            self.analyse_music(music_file)
 
-        print("\n[INFO] Type 'STOP DANCING' and press Enter to stop the robot.\n")
+
+    def stop(self):
+        """Stop the dancer and shut down the server."""
+        self.is_running = False
+        if self.dancer_server_proc:
+            self.logger("[INFO] Shutting down DANCER server...", level="info")
+            self.dancer_server_proc.terminate()
+            self.dancer_server_proc.wait()
+
+    def analyse_music(self, music_path: str):
+        music_duration = librosa.get_duration(filename=music_path)
+        offset = 0
 
         try:
             while self.is_running and offset < music_duration:
-                mood = self.analyze_music_segment(offset, self.analysis_interval)
+                mood = self.analyze_music_segment(music_path=music_path, offset=offset, duration=self.analysis_interval)
 
                 if mood != self.current_mood:
                     self.current_mood = mood
@@ -98,31 +114,8 @@ class Dancer:
                 offset += self.analysis_interval
                 time.sleep(self.analysis_interval)
 
-                if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
-                    command = sys.stdin.readline().strip().upper()
-                    if command == "STOP DANCING":
-                        print("[INFO] Stop command received.")
-                        break
-
         except KeyboardInterrupt:
-            print("\n[INFO] Interrupted manually.")
+            self.logger("\n[INFO] Interrupted manually.", level="warning")
         finally:
             self.stop()
 
-    def stop(self):
-        """Stop the dancer and shut down the server."""
-        self.is_running = False
-        if self.dancer_server_proc:
-            print("[INFO] Shutting down DANCER server...")
-            self.dancer_server_proc.terminate()
-            self.dancer_server_proc.wait()
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Blossom dancing controller with live mood detection")
-    parser.add_argument("--music", type=str, required=True, help="Path to the music file (e.g., mp3 or wav)")
-    parser.add_argument("--interval", type=int, default=5, help="Analysis interval in seconds")
-    args = parser.parse_args()
-
-    dancer = Dancer(music_path=args.music, analysis_interval=args.interval)
-    dancer.start()

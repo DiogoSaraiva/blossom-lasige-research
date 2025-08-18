@@ -62,7 +62,7 @@ class MediaPipeThread(threading.Thread):
         self.logger = logger
         self.queue = Queue(maxsize=max_queue)
         self.result_buffer = result_buffer
-        self.running = True
+        self.is_running = True
         self.latest_face = None
         self.latest_pose = None
         self.last_timestamp = 0
@@ -119,10 +119,10 @@ class MediaPipeThread(threading.Thread):
         self.logger("[MediaPipe] Thread started", level="info")
         if not self.face_landmarker or not self.pose_landmarker:
             self.logger("[MediaPipe] Models not initialized properly, stopping thread", level="error")
-            self.running = False
+            self.is_running = False
             return
         try:
-            while self.running:
+            while self.is_running:
                 try:
                     item = self.queue.get(timeout=0.1)
                     if not self._valid_queue_item(item):
@@ -333,10 +333,10 @@ class MediaPipeThread(threading.Thread):
         and allows the thread to exit gracefully.
         """
         self.logger("[MediaPipe] Stopping thread", level="info")
-        if not self.running:
+        if not self.is_running:
             self.logger("[MediaPipe] Thread already stopped", level="warning")
             return
-        self.running = False
+        self.is_running = False
         try:
             self.face_landmarker.close()
             self.pose_landmarker.close()

@@ -8,10 +8,10 @@ class MimeticRunnerThread(QThread):
     def __init__(self, mimetic: Mimetic):
         super().__init__()
         self.mimetic = mimetic
-        self.running = True
+        self.is_running = True
 
     def run(self):
-        while self.running:
+        while self.is_running:
             if self.mimetic.data is not None:
                 data = self.mimetic.data
             else:
@@ -21,5 +21,5 @@ class MimeticRunnerThread(QThread):
 
 
     def stop(self):
-        self.running = False
+        self.is_running = False
         self.wait()

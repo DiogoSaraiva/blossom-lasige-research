@@ -38,6 +38,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.settings = self.settings_mgr.load()
 
         self.output_directory = self.settings.output_directory
+        self.music_directory = self.settings.music_directory
+
         self.study_id = self.settings.study_id or compact_timestamp()
         self.logger = Logger(f"{self.output_directory}/{self.study_id}/system_log.json", mode="system")
         self.host = self.settings.host or get_local_ip()
@@ -85,7 +87,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self._log_pos = 0
 
-        self.dancer = Dancer()
+        self.dancer = Dancer(host=self.host, port=self.dancer_port, logger=self.logger, music_dir=self.music_directory)
         self.is_dancing = False
         self.is_mimicking = False
         self.logger.set_system_log_level("debug")
@@ -106,7 +108,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.menu_exit_button.triggered.connect(self.close)
 
     def open_settings(self):
-        if self.mimetic.running or (self.recorder_thread and self.recorder_thread.running):
+        if self.mimetic.is_running or (self.recorder_thread and self.recorder_thread.is_running):
             QMessageBox.warning(
                 self,
                 "Settings Locked",
@@ -154,8 +156,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.logger(f"Output directory successfully changed to {self.output_directory}/{self.study_id}", level="info")
             self.logger.output_path = f"{self.output_directory}/{self.study_id}/system_log.json"
 
-
-        if self.recorder_thread and self.recorder_thread.running:
+        if self.recorder_thread and self.recorder_thread.is_running:
             self.logger("Output folder changed; will apply to the next recording.", level="warning")
 
         self.logger("Settings applied.", level="info")
@@ -181,12 +182,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if self.capture_thread:
             self.capture_thread.stop()
             self.capture_thread.join()
-        if self.mimetic.running:
+        if self.mimetic.is_running:
             self.mimetic.stop()
             self.mimetic_thread.stop()
             self.mimetic_thread.wait()
 
-        if self.recorder_thread and self.recorder_thread.running:
+        if self.recorder_thread and self.recorder_thread.is_running:
             self.recorder_thread.stop()
             self.recorder_thread.join()
         event.accept()
@@ -213,7 +214,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         def start_pose_recognition():
             self.mimetic_thread = MimeticRunnerThread(self.mimetic)
             self.mimetic_thread.data_updated.connect(self.update_mimetic_data)
-            if self.mimetic.running:
+            if self.mimetic.is_running:
                 self.logger("Pose recognition already running", level="warning")
                 return
             self.logger("Starting Pose Recognition...", level="info")
@@ -222,7 +223,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.pose_button.setText("Stop Pose Recognition")
 
         def stop_pose_recognition():
-            if not self.mimetic.running:
+            if not self.mimetic.is_running:
                 self.logger("Pose recognition already stopped", level="warning")
                 return
             self.logger("Stopping Pose Recognition...", level="info")
@@ -233,21 +234,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.pose_button.setText("Start Pose Recognition")
 
 
-        if not self.mimetic.running:
+        if not self.mimetic.is_running:
             start_pose_recognition()
         else:
             stop_pose_recognition()
 
     def update_mimetic_data(self, data: dict):
         indicators = {
-
             "left": self.left_indicator,
-
             "center": self.center_indicator,
-
             "right": self.right_indicator
-
         }
+
         def update_gaze_indicator(label: str = None):
 
             clear_gaze_indicator()
@@ -266,7 +264,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         gaze = data.get('gaze')
 
-        if gaze and self.mimetic.running:
+        if gaze and self.mimetic.is_running:
 
             gaze_label = gaze.get("label", None)
 
@@ -379,7 +377,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         def reset():
             if self.is_mimicking:
-                self.logger(f"Resetting Mimetic Blossom server...", level="debug")
+                self.logger(f"Resetting Mimetic Blossom...", level="warning")
                 if self.mimetic.is_sending:
                     self.logger("Sending reset command and stopping blossom sending process", level="debug")
                     self.send_blossom_command("mimetic", "reset")
@@ -410,7 +408,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.recording_button.setEnabled(True)
 
         def stop_recording():
-            if not self.recorder_thread or not self.recorder_thread.running:
+            if not self.recorder_thread or not self.recorder_thread.is_running:
                 self.logger("Recording is already stopped.", level="warning")
                 return
             self.logger("Stopping recording...", level="info")
@@ -419,7 +417,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.recording_button.setText("Start Rec.")
             self.recorder_thread = None
 
-        if self.recorder_thread and self.recorder_thread.running:
+        if self.recorder_thread and self.recorder_thread.is_running:
             stop_recording()
         else:
             start_recording()
@@ -489,7 +487,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.dancer_button.setText("Stop Dancer")
 
         def stop():
-            if not self.dancer.running:
+            if not self.dancer.is_running:
                 self.logger("Dancer already stopped", level="warning")
                 return
             self.logger("Stopping Dancer...", level="info")

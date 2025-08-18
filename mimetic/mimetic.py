@@ -35,7 +35,7 @@ class Mimetic:
         self.limiter = MotionLimiter(logger=self.logger)
         self.pose_buffer = PoseBuffer(logger=self.logger)
         self.cam_view_title = "Pose Estimation" + (" (Mirrored)" if self.mirror_video else "")
-        self.running = False
+        self.is_running = False
         self.angle_offset = {"pitch": 0, "roll": 0, "yaw": 0}
         self.blossom_sender_thread = blossom_sender or BlossomSenderThread(host=self.host, port=self.port,
                                                                            logger=self.logger)
@@ -47,7 +47,7 @@ class Mimetic:
         self.right_threshold = right_threshold
 
     def _main_loop(self):
-        self.running = True
+        self.is_running = True
         last_pose_data = None
 
         prev_time = time.time()
@@ -150,18 +150,16 @@ class Mimetic:
             self.logger(f"[Mimetic] Exception in main loop: {e} \n {traceback.format_exc()}", level="critical")
 
         finally:
-            self.running = False
+            self.is_running = False
 
     def update_threshold(self, left_threshold, right_threshold):
         self.left_threshold, self.right_threshold = left_threshold, right_threshold
-        if self.running:
+        if self.is_running:
             self.mp_thread = MediaPipeThread(result_buffer=self.pose_buffer, logger=self.logger,
                                          left_threshold=self.left_threshold, right_threshold=self.right_threshold)
     def update_output_directory(self, directory):
-        #self.running = False
         self.output_directory = directory
         self.pose_logger = Logger(f"{directory}/{self.study_id}/pose_log.json", mode="pose")
-        #self.running = True
 
     def start_sending(self):
         if self.is_sending:
@@ -254,7 +252,7 @@ class Mimetic:
         self._stop_event.set()
         if self._thread is not None and self._thread.is_alive():
             self._thread.join()
-        self.running = False
+        self.is_running = False
         if self.mp_thread:
             self.mp_thread.stop()
             self.mp_thread.join()

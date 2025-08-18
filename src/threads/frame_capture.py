@@ -44,7 +44,7 @@ class FrameCaptureThread(threading.Thread):
             if actual_width == width and actual_height == height:
                 self.logger(f"[INFO] Using max supported resolution: {width}x{height}", level="info")
                 break
-        self.running = True
+        self.is_running = True
         self.latest_frame = None
         self.lock = threading.Lock()
 
@@ -56,7 +56,7 @@ class FrameCaptureThread(threading.Thread):
         """
         self.logger("[FrameCaptureThread] Thread started")
         try:
-            while self.running and self.cap.isOpened():
+            while self.is_running and self.cap.isOpened():
                 ret, frame = self.cap.read()
                 if ret:
                     with self.lock:
@@ -93,7 +93,7 @@ class FrameCaptureThread(threading.Thread):
         """
         Stops the frame capture thread and releases the camera resource.
         """
-        self.running = False
+        self.is_running = False
         if self.cap.isOpened():
             self.cap.release()
         self.logger("[FrameCaptureThread] Thread stopped", level="info")
