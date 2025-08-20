@@ -31,7 +31,7 @@ class BlossomSenderThread(threading.Thread):
         super().__init__()
         self.logger = logger
         self.queue = Queue(maxsize=max_queue)
-        self.running = True
+        self.is_running = True
         self.host = host
         self.port = port
         self.min_interval = min_interval
@@ -46,7 +46,7 @@ class BlossomSenderThread(threading.Thread):
         """
         self.logger("[BlossomSender] Thread started", level="info")
         try:
-            while self.running:
+            while self.is_running:
                 try:
                     payload = self.queue.get(timeout=0.1)
                     if payload is None:
@@ -90,7 +90,7 @@ class BlossomSenderThread(threading.Thread):
 
         Signals the thread to stop, unblocks the queue, and clears any remaining payloads.
         """
-        self.running = False
+        self.is_running = False
         try:
             self.queue.put_nowait(None)  # unblock queue.get()
         except Full:

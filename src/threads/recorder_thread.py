@@ -14,26 +14,26 @@ class RecorderThread(threading.Thread):
         self.resolution = resolution
         self.fps = fps
         self.mirror = mirror
-        self.running = False
+        self.is_running = False
 
         self.recorder = FFmpegRecorder(output_path=output_path, fps=self.fps, resolution=self.resolution, logger=self.logger)
         self.ready = threading.Event()
 
     def run(self):
-        if not self.capture_thread.running:
+        if not self.capture_thread.is_running:
             self.logger("[Recorder] Capture thread is not running. Exiting.", level="error")
             return
 
         try:
             self.recorder.start_recording()
-            self.running = True
+            self.is_running = True
             self.logger("[Recorder] Started", level="info")
             self.ready.set()
 
         except Exception as e:
             import traceback
             self.logger(f"[Recorder] CRASHED: {e}\n{traceback.format_exc()}", level="critical")
-            self.running = False
+            self.is_running = False
             return
 
         self.logger(f"[Recorder] Recording started at {self.fps} FPS with resolution {self.resolution[0]}x{self.resolution[1]}", level="info")
@@ -43,7 +43,7 @@ class RecorderThread(threading.Thread):
         first_written = False
 
         try:
-            while self.running:
+            while self.is_running:
                 frame = self.capture_thread.get_frame(mirror_video=self.mirror)
                 if frame is not None and frame.size > 0:
                     success = self.recorder.write_frame(frame)
@@ -69,9 +69,9 @@ class RecorderThread(threading.Thread):
 
     def stop(self):
         self.logger("[Recorder] Stop called", level="debug")
-        if self.running:
+        if self.is_running:
             try:
-                self.running = False
+                self.is_running = False
                 self.ready.clear()
             except Exception as e:
                 self.logger(f"[Recorder] Error stopping recording: {e}", level="error")

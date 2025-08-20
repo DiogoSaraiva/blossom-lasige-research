@@ -1,4 +1,4 @@
-blo# LASIGE - Summer of Research
+# LASIGE - Summer of Research
 
 This repo contains my research work regarding the **LASIGE Summer of Research 2025**, based on the **Blossom** platform.
 

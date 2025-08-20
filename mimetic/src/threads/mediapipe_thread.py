@@ -12,10 +12,28 @@ from mediapipe.tasks.python.vision import (
 )
 
 from mimetic.src.pose_buffer import PoseBuffer
-from mimetic.src.pose_utils import PoseUtils
 from src.logging_utils import Logger
 
 from mimetic.src.gaze_utils import GazeEstimator
+
+FACE_MESH_LANDMARKS = {
+    'left_eye': 33,
+    'right_eye': 263,
+    'nose_tip': 1,
+    'chin': 152,
+    'forehead': 10,
+    'left_cheek': 234,
+    'right_cheek': 454,
+    'mouth_left': 61,
+    'mouth_right': 291
+}
+
+POSE_LANDMARKS = {
+    'left_shoulder': 11,
+    'right_shoulder': 12,
+    'mouth_left': 9,
+    'mouth_right': 10
+}
 
 class MediaPipeThread(threading.Thread):
     """
@@ -44,7 +62,7 @@ class MediaPipeThread(threading.Thread):
         self.logger = logger
         self.queue = Queue(maxsize=max_queue)
         self.result_buffer = result_buffer
-        self.running = True
+        self.is_running = True
         self.latest_face = None
         self.latest_pose = None
         self.last_timestamp = 0
@@ -71,7 +89,9 @@ class MediaPipeThread(threading.Thread):
             self.logger(f"[MediaPipe] Error initializing MediaPipe models: {e}", level="critical")
             raise RuntimeError("Failed to initialize MediaPipe models") from e
 
-        self.pose_utils = PoseUtils(logger=logger)
+    def update_thresholds(self, left_threshold: float, right_threshold: float):
+        self.gaze_estimator = GazeEstimator(left_threshold=left_threshold, right_threshold=right_threshold)
+
 
     def _init_landmarkers(self, face_model, pose_model):
         base_delegate = BaseOptions.Delegate.GPU
@@ -99,10 +119,10 @@ class MediaPipeThread(threading.Thread):
         self.logger("[MediaPipe] Thread started", level="info")
         if not self.face_landmarker or not self.pose_landmarker:
             self.logger("[MediaPipe] Models not initialized properly, stopping thread", level="error")
-            self.running = False
+            self.is_running = False
             return
         try:
-            while self.running:
+            while self.is_running:
                 try:
                     item = self.queue.get(timeout=0.1)
                     if not self._valid_queue_item(item):
@@ -219,13 +239,12 @@ class MediaPipeThread(threading.Thread):
         try:
             face_landmarks = self.latest_face.face_landmarks[0]
             pose_landmarks = self.latest_pose.pose_landmarks[0]
-            self.pose_utils.update(face_landmarks, pose_landmarks)
 
             matrix = self.latest_face.facial_transformation_matrixes[0].data
             matrix_np = np.array(matrix, dtype=np.float32).reshape(4, 4)
             pitch, roll, yaw = self.extract_data_from_matrix(data=matrix_np)
 
-            height = self.pose_utils.estimate_height()
+            height = self.estimate_height(face_landmarks, pose_landmarks)
 
             gaze_label, gaze_ratio = self.gaze_estimator.update_from_landmarks(landmarks=face_landmarks)
 
@@ -251,6 +270,61 @@ class MediaPipeThread(threading.Thread):
         yaw = euler_angles[1][0]
         return pitch, roll, yaw
 
+
+    def estimate_height(self, face_landmarks, pose_landmarks):
+        """
+        Estimates the height of the person based on the position of the shoulders and head.
+
+        Returns:
+            int or None: Estimated height as a percentage of a reference height, or None if estimation fails.
+        """
+        def get_landmark(key, source='face'):
+            try:
+                if source == 'face':
+                    index = FACE_MESH_LANDMARKS[key]
+                    return face_landmarks[index]
+                elif source == 'pose':
+                    index = POSE_LANDMARKS[key]
+                    return pose_landmarks[index]
+                else:
+                    self.logger(f"[PoseUtils] Unknown landmark source: {source}", level='warning')
+                    return None
+            except (KeyError, IndexError, TypeError) as e:
+                self.logger(f"[PoseUtils] Failed to get landmark {key} from source: {source}: {e}", level='warning')
+                return None
+
+        if not face_landmarks or not pose_landmarks:
+            self.logger("[PoseUtils] No landmarks available for height estimation", level='debug')
+            return None
+        try:
+            nose = get_landmark('nose_tip', 'face')
+            mouth_left = get_landmark('mouth_left', 'face')
+            mouth_right = get_landmark('mouth_right', 'face')
+            mouth_y = (mouth_left.y + mouth_right.y) / 2
+            head_center_y = (nose.y + mouth_y) / 2
+
+            l_shoulder = get_landmark('left_shoulder', 'pose')
+            r_shoulder = get_landmark('right_shoulder', 'pose')
+
+            shoulder_y = (l_shoulder.y + r_shoulder.y) / 2
+            vertical_diff = shoulder_y - head_center_y
+            shoulder_dx = abs(r_shoulder.x - l_shoulder.x)
+
+            if shoulder_dx < 0.01:
+                return None
+
+            posture_ratio = np.clip((vertical_diff - 0.15) / (0.25 - 0.15), 0.0, 1.0)
+
+            raw_distance = (shoulder_dx - 0.28) / (0.40 - 0.28)
+            raw_distance = max(raw_distance, 0.0)
+            distance_ratio = np.clip(raw_distance ** 0.5, 0.0, 1.0)
+
+            combined = 0.8 * posture_ratio + 0.2 * distance_ratio
+            return int(combined * 100)
+        except Exception as e:
+            self.logger(f"[PoseUtils] Error estimating height: {e}", level='warning')
+            return None
+
     def stop(self):
         """
         Stops the MediaPipe thread and releases resources.
@@ -259,10 +333,10 @@ class MediaPipeThread(threading.Thread):
         and allows the thread to exit gracefully.
         """
         self.logger("[MediaPipe] Stopping thread", level="info")
-        if not self.running:
+        if not self.is_running:
             self.logger("[MediaPipe] Thread already stopped", level="warning")
             return
-        self.running = False
+        self.is_running = False
         try:
             self.face_landmarker.close()
             self.pose_landmarker.close()
