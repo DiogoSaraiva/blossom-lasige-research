@@ -18,10 +18,10 @@ class MotionLimiter:
         values (dict): Stores the last value for each key.
     """
 
-    def __init__(self, logger: Logger, alpha_map: dict=None, rate_hz: int=5, threshold: float=2.0, ):
+    def __init__(self, logger: Logger, alpha_map: dict=None, send_rate: int=5, threshold: float=2.0, ):
         self.logger = logger
-        # Higher alpha value - Less filtered, higher response time
-        # Less alpha value - More filtered, lower response time
+        # Higher alpha value - Less filtered, lower time to respond
+        # Less alpha value - More filtered, higher time to respond
         self.alpha_map = alpha_map or {
             "x": 0.4,  # pitch
             "y": 0.4,  # roll
@@ -37,7 +37,7 @@ class MotionLimiter:
             "e": 70.0
         }
         self.last_sent = 0
-        self.min_interval = 1.0 / rate_hz
+        self.min_interval = 1.0 / send_rate
         self.threshold = threshold
         self.last_data = self.smoothed.copy()
         self.values = {}

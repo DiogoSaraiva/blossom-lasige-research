@@ -1,23 +1,23 @@
 import threading
 import time
-from typing import Tuple
+from typing import Tuple, Literal
 
 import numpy as np
 
 from mimetic.src.motion_limiter import MotionLimiter
 from mimetic.src.pose_buffer import PoseBuffer
-from mimetic.src.threads.blossom_sender import BlossomSenderThread
+from src.threads.blossom_sender import BlossomSenderThread
 from mimetic.src.threads.mediapipe_thread import MediaPipeThread
-from src.utils import get_local_ip
 from src.logging_utils import Logger, print_logger
 from src.threads.frame_capture import FrameCaptureThread
 from src.utils import compact_timestamp
 
 
 class Mimetic:
-    def __init__(self, output_directory: str, study_id: str | int, host: str, port: int, mirror_video: bool,
-                 capture_thread: FrameCaptureThread, logger: dict[str, Logger],
-                 blossom_sender: BlossomSenderThread = None, left_threshold: float = 0.45, right_threshold: float = 0.55):
+    def __init__(self, output_directory: str, study_id: str | int, mirror_video: bool,
+                 capture_thread: FrameCaptureThread, logger: dict[str, Logger], alpha_map: dict[str, float],
+                 send_rate: int, send_threshold: float,
+                 left_threshold: float = 0.45, right_threshold: float = 0.55,):
         self._stop_event = threading.Event()
         self._thread = None
         self.output_directory = output_directory or "./output"
@@ -28,23 +28,25 @@ class Mimetic:
             if logger and logger.get("pose") is not None
             else Logger(f"{output_directory}/{self.study_id}/pose_log.json", mode="pose")
         )
-        self.host = host or get_local_ip()
-        self.port = port
         self.mirror_video = bool(mirror_video)
         self.capture_thread = capture_thread or FrameCaptureThread(logger=self.logger)
-        self.limiter = MotionLimiter(logger=self.logger)
+        self.limiter = MotionLimiter(logger=self.logger, alpha_map=alpha_map, send_rate=send_rate, threshold=send_threshold)
         self.pose_buffer = PoseBuffer(logger=self.logger)
         self.cam_view_title = "Pose Estimation" + (" (Mirrored)" if self.mirror_video else "")
         self.is_running = False
         self.angle_offset = {"pitch": 0, "roll": 0, "yaw": 0}
-        self.blossom_sender_thread = blossom_sender or BlossomSenderThread(host=self.host, port=self.port,
-                                                                           logger=self.logger)
+        self.blossom_sender_one = None
+        self.blossom_sender_two = None
         self.mp_thread = None
         self.is_sending = False
         self.data = {}
 
         self.left_threshold = left_threshold
         self.right_threshold = right_threshold
+
+
+    def update_sender(self, number: Literal["one", "two"], blossom_sender: BlossomSenderThread | None):
+        setattr(self, f"blossom_sender_{number}", blossom_sender)
 
     def _main_loop(self):
         self.is_running = True
@@ -137,7 +139,10 @@ class Mimetic:
                 # Send data to Blossom if needed
                 if self.is_sending and should_send:
                     try:
-                        self.blossom_sender_thread.send(payload)
+                        if getattr(self, "blossom_sender_one", None) is not None:
+                            self.blossom_sender_one.send(payload)
+                        if getattr(self, "blossom_sender_two", None) is not None:
+                            self.blossom_sender_two.send(payload)
                     except Exception as e:
                         self.logger(f"[Mimetic] Error sending to Blossom: {e}", level="error")
                 frame_elapsed_time = time.time() - frame_start_time
@@ -161,22 +166,21 @@ class Mimetic:
         self.output_directory = directory
         self.pose_logger = Logger(f"{directory}/{self.study_id}/pose_log.json", mode="pose")
 
-    def start_sending(self):
+    def start_sending(self, blossom_sender: BlossomSenderThread):
         if self.is_sending:
             self.logger("[Mimetic] Sending already enabled.", level="warning")
             return
-        self.blossom_sender_thread = BlossomSenderThread(host=self.host, port=self.port, logger=self.logger)
-        self.blossom_sender_thread.start()
+        blossom_sender.start()
         self.is_sending = True
 
-    def stop_sending(self):
+    def stop_sending(self, blossom_sender: BlossomSenderThread):
         if not self.is_sending:
             self.logger(f"[Mimetic] Sending not enabled.", level="warning")
             return
         self.is_sending = False
-        if self.blossom_sender_thread.is_alive():
-            self.blossom_sender_thread.stop()
-            self.blossom_sender_thread.join()
+
+        blossom_sender.stop()
+        blossom_sender.join()
 
 
     def initialize(self) -> Tuple[int, int]:
@@ -256,6 +260,3 @@ class Mimetic:
         if self.mp_thread:
             self.mp_thread.stop()
             self.mp_thread.join()
-        if self.blossom_sender_thread.is_alive():
-            self.blossom_sender_thread.stop()
-            self.blossom_sender_thread.join()

@@ -1,5 +1,7 @@
 import threading
 import time
+from typing import Literal
+
 import requests
 from queue import Queue, Empty, Full
 
@@ -17,7 +19,7 @@ class BlossomSenderThread(threading.Thread):
         min_interval (float): Minimum interval (in seconds) between sends.
         logger (Logger, optional): Logger instance for logging events.
     """
-    def __init__(self, logger:Logger, host="localhost", port: int=8000, max_queue:int=32, min_interval:float=0.1):
+    def __init__(self, logger:Logger, mode: Literal["mimetic", "dancer"], host="localhost", port: int=8000, max_queue:int=32, min_interval:float=0.1):
         """
         Initialize the BlossomSenderThread.
 
@@ -36,6 +38,8 @@ class BlossomSenderThread(threading.Thread):
         self.port = port
         self.min_interval = min_interval
         self.last_send_time = 0
+        self.mode = mode
+        self.last_sequence = None
 
     def run(self):
         """
@@ -44,7 +48,7 @@ class BlossomSenderThread(threading.Thread):
         Continuously checks the queue for new payloads and sends them to the server,
         respecting the minimum interval between sends. Handles errors and logs events.
         """
-        self.logger("[BlossomSender] Thread started", level="info")
+        self.logger(f"[BlossomSender] Thread started (mode: {self.mode})", level="info")
         try:
             while self.is_running:
                 try:
@@ -70,7 +74,13 @@ class BlossomSenderThread(threading.Thread):
                     continue
         except Exception as e:
             import traceback
-            self.logger(f"[BlossomSenderThread] CRASHED: {e} \n {traceback.format_exc()}", level="critical")
+            self.logger(f"[BlossomSender] CRASHED: {e} \n {traceback.format_exc()}", level="critical")
+
+    def _cooperative_sleep(self, seconds: float, step: float = 0.02):
+        """Sleep in small steps so stop() can interrupt quickly."""
+        end = time.time() + max(0.0, seconds)
+        while self.is_running and time.time() < end:
+            time.sleep(min(step, end - time.time()))
 
     def send(self, payload: dict):
         """
@@ -79,10 +89,13 @@ class BlossomSenderThread(threading.Thread):
         Args:
             payload (dict): Dictionary containing the data to send.
         """
-        if not self.queue.full():
-            self.queue.put_nowait(payload)
+        if self.mode == "mimetic":
+            if not self.queue.full():
+                self.queue.put_nowait(payload)
+            else:
+                self.logger("[BlossomSender] Queue is full, dropping payload", level="warning")
         else:
-            self.logger("[BlossomSender] Queue is full, dropping payload", level="warning")
+            pass #TODO
 
     def stop(self):
         """

@@ -21,370 +21,6 @@
   </property>
   <widget class="QWidget" name="central_widget">
    <layout class="QGridLayout" name="gridLayout">
-    <item row="0" column="4">
-     <widget class="QPushButton" name="recording_button">
-      <property name="locale">
-       <locale language="English" country="UnitedStates"/>
-      </property>
-      <property name="text">
-       <string>Start Rec.</string>
-      </property>
-     </widget>
-    </item>
-    <item row="5" column="1" colspan="2">
-     <widget class="QPushButton" name="mimetic_button">
-      <property name="text">
-       <string>Start Mimetic</string>
-      </property>
-     </widget>
-    </item>
-    <item row="6" column="3" colspan="2">
-     <widget class="QPushButton" name="reset_dancer">
-      <property name="text">
-       <string>Reset Dancer</string>
-      </property>
-     </widget>
-    </item>
-    <item row="0" column="3">
-     <widget class="QPushButton" name="calibrate_pose_button">
-      <property name="text">
-       <string>Calibrate Pose</string>
-      </property>
-     </widget>
-    </item>
-    <item row="0" column="0" rowspan="7">
-     <widget class="QLabel" name="cam_feed">
-      <property name="sizePolicy">
-       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-        <horstretch>0</horstretch>
-        <verstretch>0</verstretch>
-       </sizepolicy>
-      </property>
-      <property name="minimumSize">
-       <size>
-        <width>400</width>
-        <height>270</height>
-       </size>
-      </property>
-      <property name="styleSheet">
-       <string notr="true">background-color: #333;
-color: white;
-font-size: 16px;
-qproperty-alignment: AlignCenter;
-border: 1px solid #666;</string>
-      </property>
-      <property name="text">
-       <string>Cam Off</string>
-      </property>
-      <property name="scaledContents">
-       <bool>false</bool>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignCenter</set>
-      </property>
-     </widget>
-    </item>
-    <item row="5" column="3" colspan="2">
-     <widget class="QPushButton" name="dancer_button">
-      <property name="text">
-       <string>Start Dancer</string>
-      </property>
-     </widget>
-    </item>
-    <item row="7" column="0" colspan="5">
-     <widget class="QTextEdit" name="terminal_output">
-      <property name="sizePolicy">
-       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-        <horstretch>0</horstretch>
-        <verstretch>0</verstretch>
-       </sizepolicy>
-      </property>
-      <property name="maximumSize">
-       <size>
-        <width>3840</width>
-        <height>300</height>
-       </size>
-      </property>
-      <property name="styleSheet">
-       <string notr="true">font-family: monospace;
-font-size: 13px;
-border: 1px solid #444;
-background-color: rgb(60, 60, 60);
-color: #d4d4d4;
-padding: 4px;</string>
-      </property>
-      <property name="readOnly">
-       <bool>true</bool>
-      </property>
-      <property name="placeholderText">
-       <string>Output log</string>
-      </property>
-     </widget>
-    </item>
-    <item row="2" column="1" colspan="4">
-     <widget class="QGroupBox" name="blossom_data">
-      <property name="minimumSize">
-       <size>
-        <width>360</width>
-        <height>80</height>
-       </size>
-      </property>
-      <property name="maximumSize">
-       <size>
-        <width>16777215</width>
-        <height>100</height>
-       </size>
-      </property>
-      <property name="title">
-       <string>Sent Data:</string>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignCenter</set>
-      </property>
-      <widget class="QLabel" name="blossom_pitch_title">
-       <property name="geometry">
-        <rect>
-         <x>10</x>
-         <y>30</y>
-         <width>65</width>
-         <height>20</height>
-        </rect>
-       </property>
-       <property name="minimumSize">
-        <size>
-         <width>65</width>
-         <height>20</height>
-        </size>
-       </property>
-       <property name="styleSheet">
-        <string notr="true">font-weight: bold; color: #000000;</string>
-       </property>
-       <property name="text">
-        <string>Pitch:</string>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignCenter</set>
-       </property>
-      </widget>
-      <widget class="QLabel" name="blossom_pitch_value">
-       <property name="geometry">
-        <rect>
-         <x>10</x>
-         <y>50</y>
-         <width>70</width>
-         <height>20</height>
-        </rect>
-       </property>
-       <property name="minimumSize">
-        <size>
-         <width>65</width>
-         <height>20</height>
-        </size>
-       </property>
-       <property name="text">
-        <string>--</string>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignCenter</set>
-       </property>
-      </widget>
-      <widget class="QLabel" name="blossom_roll_value">
-       <property name="geometry">
-        <rect>
-         <x>80</x>
-         <y>50</y>
-         <width>66</width>
-         <height>20</height>
-        </rect>
-       </property>
-       <property name="minimumSize">
-        <size>
-         <width>65</width>
-         <height>20</height>
-        </size>
-       </property>
-       <property name="text">
-        <string>--</string>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignCenter</set>
-       </property>
-      </widget>
-      <widget class="QLabel" name="blossom_roll_title">
-       <property name="geometry">
-        <rect>
-         <x>80</x>
-         <y>30</y>
-         <width>65</width>
-         <height>20</height>
-        </rect>
-       </property>
-       <property name="minimumSize">
-        <size>
-         <width>65</width>
-         <height>20</height>
-        </size>
-       </property>
-       <property name="styleSheet">
-        <string notr="true">font-weight: bold; color: #000000;</string>
-       </property>
-       <property name="text">
-        <string>Roll:</string>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignCenter</set>
-       </property>
-      </widget>
-      <widget class="QLabel" name="blossom_yaw_title">
-       <property name="geometry">
-        <rect>
-         <x>150</x>
-         <y>30</y>
-         <width>65</width>
-         <height>20</height>
-        </rect>
-       </property>
-       <property name="minimumSize">
-        <size>
-         <width>65</width>
-         <height>20</height>
-        </size>
-       </property>
-       <property name="styleSheet">
-        <string notr="true">font-weight: bold; color: #000000;</string>
-       </property>
-       <property name="text">
-        <string>Yaw:</string>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignCenter</set>
-       </property>
-      </widget>
-      <widget class="QLabel" name="blossom_yaw_value">
-       <property name="geometry">
-        <rect>
-         <x>150</x>
-         <y>50</y>
-         <width>66</width>
-         <height>20</height>
-        </rect>
-       </property>
-       <property name="minimumSize">
-        <size>
-         <width>65</width>
-         <height>20</height>
-        </size>
-       </property>
-       <property name="text">
-        <string>--</string>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignCenter</set>
-       </property>
-      </widget>
-      <widget class="QLabel" name="blossom_height_title">
-       <property name="geometry">
-        <rect>
-         <x>220</x>
-         <y>30</y>
-         <width>65</width>
-         <height>20</height>
-        </rect>
-       </property>
-       <property name="minimumSize">
-        <size>
-         <width>65</width>
-         <height>20</height>
-        </size>
-       </property>
-       <property name="styleSheet">
-        <string notr="true">font-weight: bold; color: #000000;</string>
-       </property>
-       <property name="text">
-        <string>Height:</string>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignCenter</set>
-       </property>
-      </widget>
-      <widget class="QLabel" name="blossom_height_value">
-       <property name="geometry">
-        <rect>
-         <x>220</x>
-         <y>50</y>
-         <width>66</width>
-         <height>20</height>
-        </rect>
-       </property>
-       <property name="minimumSize">
-        <size>
-         <width>65</width>
-         <height>20</height>
-        </size>
-       </property>
-       <property name="text">
-        <string>--</string>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignCenter</set>
-       </property>
-      </widget>
-      <widget class="QLabel" name="blossom_ears_title">
-       <property name="geometry">
-        <rect>
-         <x>290</x>
-         <y>30</y>
-         <width>65</width>
-         <height>20</height>
-        </rect>
-       </property>
-       <property name="minimumSize">
-        <size>
-         <width>65</width>
-         <height>20</height>
-        </size>
-       </property>
-       <property name="styleSheet">
-        <string notr="true">font-weight: bold; color: #000000;</string>
-       </property>
-       <property name="text">
-        <string>Ears:</string>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignCenter</set>
-       </property>
-      </widget>
-      <widget class="QLabel" name="blossom_ears_value">
-       <property name="geometry">
-        <rect>
-         <x>290</x>
-         <y>50</y>
-         <width>66</width>
-         <height>20</height>
-        </rect>
-       </property>
-       <property name="minimumSize">
-        <size>
-         <width>65</width>
-         <height>20</height>
-        </size>
-       </property>
-       <property name="text">
-        <string>--</string>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignCenter</set>
-       </property>
-      </widget>
-     </widget>
-    </item>
-    <item row="6" column="1" colspan="2">
-     <widget class="QPushButton" name="reset_mimetic">
-      <property name="text">
-       <string>Reset Mimetic</string>
-      </property>
-     </widget>
-    </item>
     <item row="0" column="1" colspan="2">
      <widget class="QPushButton" name="pose_button">
       <property name="locale">
@@ -395,7 +31,24 @@ padding: 4px;</string>
       </property>
      </widget>
     </item>
-    <item row="1" column="1" colspan="4">
+    <item row="0" column="3" colspan="2">
+     <widget class="QPushButton" name="calibrate_pose_button">
+      <property name="text">
+       <string>Calibrate Pose</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="5">
+     <widget class="QPushButton" name="recording_button">
+      <property name="locale">
+       <locale language="English" country="UnitedStates"/>
+      </property>
+      <property name="text">
+       <string>Start Rec.</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="1" colspan="5">
      <widget class="QGroupBox" name="pose_data">
       <property name="minimumSize">
        <size>
@@ -685,7 +338,264 @@ QCheckBox::indicator:unchecked {
       </widget>
      </widget>
     </item>
-    <item row="3" column="1">
+    <item row="2" column="1" colspan="5">
+     <widget class="QGroupBox" name="blossom_data">
+      <property name="minimumSize">
+       <size>
+        <width>360</width>
+        <height>80</height>
+       </size>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>16777215</width>
+        <height>100</height>
+       </size>
+      </property>
+      <property name="title">
+       <string>Sent Data:</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+      <widget class="QLabel" name="blossom_pitch_title">
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>30</y>
+         <width>65</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>65</width>
+         <height>20</height>
+        </size>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">font-weight: bold; color: #000000;</string>
+       </property>
+       <property name="text">
+        <string>Pitch:</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignCenter</set>
+       </property>
+      </widget>
+      <widget class="QLabel" name="blossom_pitch_value">
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>50</y>
+         <width>70</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>65</width>
+         <height>20</height>
+        </size>
+       </property>
+       <property name="text">
+        <string>--</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignCenter</set>
+       </property>
+      </widget>
+      <widget class="QLabel" name="blossom_roll_value">
+       <property name="geometry">
+        <rect>
+         <x>80</x>
+         <y>50</y>
+         <width>66</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>65</width>
+         <height>20</height>
+        </size>
+       </property>
+       <property name="text">
+        <string>--</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignCenter</set>
+       </property>
+      </widget>
+      <widget class="QLabel" name="blossom_roll_title">
+       <property name="geometry">
+        <rect>
+         <x>80</x>
+         <y>30</y>
+         <width>65</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>65</width>
+         <height>20</height>
+        </size>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">font-weight: bold; color: #000000;</string>
+       </property>
+       <property name="text">
+        <string>Roll:</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignCenter</set>
+       </property>
+      </widget>
+      <widget class="QLabel" name="blossom_yaw_title">
+       <property name="geometry">
+        <rect>
+         <x>150</x>
+         <y>30</y>
+         <width>65</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>65</width>
+         <height>20</height>
+        </size>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">font-weight: bold; color: #000000;</string>
+       </property>
+       <property name="text">
+        <string>Yaw:</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignCenter</set>
+       </property>
+      </widget>
+      <widget class="QLabel" name="blossom_yaw_value">
+       <property name="geometry">
+        <rect>
+         <x>150</x>
+         <y>50</y>
+         <width>66</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>65</width>
+         <height>20</height>
+        </size>
+       </property>
+       <property name="text">
+        <string>--</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignCenter</set>
+       </property>
+      </widget>
+      <widget class="QLabel" name="blossom_height_title">
+       <property name="geometry">
+        <rect>
+         <x>220</x>
+         <y>30</y>
+         <width>65</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>65</width>
+         <height>20</height>
+        </size>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">font-weight: bold; color: #000000;</string>
+       </property>
+       <property name="text">
+        <string>Height:</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignCenter</set>
+       </property>
+      </widget>
+      <widget class="QLabel" name="blossom_height_value">
+       <property name="geometry">
+        <rect>
+         <x>220</x>
+         <y>50</y>
+         <width>66</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>65</width>
+         <height>20</height>
+        </size>
+       </property>
+       <property name="text">
+        <string>--</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignCenter</set>
+       </property>
+      </widget>
+      <widget class="QLabel" name="blossom_ears_title">
+       <property name="geometry">
+        <rect>
+         <x>290</x>
+         <y>30</y>
+         <width>65</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>65</width>
+         <height>20</height>
+        </size>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">font-weight: bold; color: #000000;</string>
+       </property>
+       <property name="text">
+        <string>Ears:</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignCenter</set>
+       </property>
+      </widget>
+      <widget class="QLabel" name="blossom_ears_value">
+       <property name="geometry">
+        <rect>
+         <x>290</x>
+         <y>50</y>
+         <width>66</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>65</width>
+         <height>20</height>
+        </size>
+       </property>
+       <property name="text">
+        <string>--</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignCenter</set>
+       </property>
+      </widget>
+     </widget>
+    </item>
+    <item row="3" column="1" colspan="2">
      <widget class="QGroupBox" name="groupBox">
       <property name="minimumSize">
        <size>
@@ -930,6 +840,139 @@ QCheckBox::indicator:unchecked {
         <set>Qt::AlignCenter</set>
        </property>
       </widget>
+     </widget>
+    </item>
+    <item row="4" column="1">
+     <widget class="QPushButton" name="blossom_one_button">
+      <property name="maximumSize">
+       <size>
+        <width>60</width>
+        <height>16777215</height>
+       </size>
+      </property>
+      <property name="text">
+       <string>Start</string>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="2">
+     <widget class="QComboBox" name="blossom_one_type">
+      <item>
+       <property name="text">
+        <string>mimetic</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>dancer</string>
+       </property>
+      </item>
+     </widget>
+    </item>
+    <item row="4" column="3">
+     <widget class="QPushButton" name="blossom_two_button">
+      <property name="maximumSize">
+       <size>
+        <width>60</width>
+        <height>16777215</height>
+       </size>
+      </property>
+      <property name="text">
+       <string>Start</string>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="4" colspan="2">
+     <widget class="QComboBox" name="blossom_two_type">
+      <property name="enabled">
+       <bool>true</bool>
+      </property>
+      <item>
+       <property name="text">
+        <string>dancer</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>mimetic</string>
+       </property>
+      </item>
+     </widget>
+    </item>
+    <item row="5" column="1" colspan="2">
+     <widget class="QPushButton" name="reset_blossom_one">
+      <property name="text">
+       <string>Reset Blossom One</string>
+      </property>
+     </widget>
+    </item>
+    <item row="5" column="3" colspan="3">
+     <widget class="QPushButton" name="reset_blossom_two">
+      <property name="text">
+       <string>Reset Blossom Two</string>
+      </property>
+     </widget>
+    </item>
+    <item row="6" column="0" colspan="6">
+     <widget class="QTextEdit" name="terminal_output">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>3840</width>
+        <height>300</height>
+       </size>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">font-family: monospace;
+font-size: 13px;
+border: 1px solid #444;
+background-color: rgb(60, 60, 60);
+color: #d4d4d4;
+padding: 4px;</string>
+      </property>
+      <property name="readOnly">
+       <bool>true</bool>
+      </property>
+      <property name="placeholderText">
+       <string>Output log</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="0" rowspan="6">
+     <widget class="QLabel" name="cam_feed">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="minimumSize">
+       <size>
+        <width>400</width>
+        <height>270</height>
+       </size>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">background-color: #333;
+color: white;
+font-size: 16px;
+qproperty-alignment: AlignCenter;
+border: 1px solid #666;</string>
+      </property>
+      <property name="text">
+       <string>Cam Off</string>
+      </property>
+      <property name="scaledContents">
+       <bool>false</bool>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
      </widget>
     </item>
    </layout>
