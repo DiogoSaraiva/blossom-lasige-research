@@ -11,7 +11,7 @@ import sounddevice as sd
 import json
 
 from src.logging_utils import Logger
-from mimetic.src.threads.blossom_sender import BlossomSenderThread
+from src.threads.blossom_sender import BlossomSenderThread
 
 
 class Dancer:

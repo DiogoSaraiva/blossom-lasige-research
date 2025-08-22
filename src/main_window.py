@@ -2,7 +2,7 @@ import json
 import subprocess
 import time
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Optional
 
 # noinspection PyPackageRequirements
 import cv2
@@ -16,6 +16,7 @@ from src.logging_utils import Logger
 from src.main_window_ui import Ui_MainWindow
 from src.settings import Settings, SettingManager
 from src.settings_dialog import SettingsDialog
+from src.threads.blossom_sender import BlossomSenderThread
 from src.threads.blossom_server_launcher import BlossomServerLauncher
 from src.threads.calibrate_thread import CalibrateThread
 from src.threads.frame_capture import FrameCaptureThread
@@ -27,10 +28,19 @@ from src.utils import compact_timestamp, get_local_ip
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
         super().__init__()
+        self.setupUi(self)
+        self.blossom_one_type.currentTextChanged.connect(lambda: self.on_blossom_type_changed("one"))
+        self.blossom_two_type.currentTextChanged.connect(lambda: self.on_blossom_type_changed("two"))
 
         self._last_gaze_label = None
-        self.mimetic_server_process = None
-        self.setupUi(self)
+
+        self.blossom_one_active = False
+        self.blossom_two_active = False
+        self.blossom_one_server_process = None
+        self.blossom_two_server_process = None
+        self.blossom_one_launcher = None
+        self.blossom_two_launcher = None
+
         self.setWindowTitle("Blossom LASIGE Research")
         self.timer = QTimer()
 
@@ -43,8 +53,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.study_id = self.settings.study_id or compact_timestamp()
         self.logger = Logger(f"{self.output_directory}/{self.study_id}/system_log.json", mode="system")
         self.host = self.settings.host or get_local_ip()
-        self.mimetic_port = self.settings.mimetic_port
-        self.dancer_port = self.settings.dancer_port
         self.mirror_video = self.settings.mirror_video
         self.flip_blossom = self.settings.flip_blossom
 
@@ -55,6 +63,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.log_timer.timeout.connect(self.load_logs_to_textedit) # type: ignore
         self.log_timer.start(200)
         self._last_log_index = 0
+
+        self.blossom_one_port = self.settings.blossom_one_port
+        self.blossom_two_port = self.settings.blossom_two_port
+
+        self.alpha_map = self.settings.alpha_map
+        self.send_rate = self.settings.send_rate
+        self.send_threshold = self.settings.send_threshold
 
         max_wait = 5
         start_time = time.time()
@@ -67,10 +82,34 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.logger("Failed to retrieve frame resolution in time.", level="error")
             self.frame_height, self.frame_width = 480, 640  # fallback default
 
+        self.blossom_one_sender = None
+        self.blossom_two_sender = None
+
+        self.mimetic_thread = None
+        self.calib_thread = None
+
+        self.timer.timeout.connect(self.update_video_frame)  # type: ignore
+        self.timer.start(30)
+
+        self.pose_button.clicked.connect(self.toggle_pose_recognition)
+        self.calibrate_pose_button.clicked.connect(self.calibrate_pose)
+        self.recording_button.clicked.connect(self.toggle_recording)
+        self.blossom_one_button.clicked.connect(lambda: self.toggle_blossom(number="one"))
+        self.blossom_two_button.clicked.connect(lambda: self.toggle_blossom(number="two"))
+        self.reset_blossom_one.clicked.connect(lambda: self.toggle_blossom(number="one", action="reset"))
+        self.reset_blossom_two.clicked.connect(lambda: self.toggle_blossom(number="two", action="reset"))
+        self.menu_settings_button.triggered.connect(self.open_settings)
+        self.menu_exit_button.triggered.connect(self.close)
+
+        self.recorder_thread = None
+
+        self._log_pos = 0
+        self.analysis_interval = self.settings.analysis_interval
+
+        self.logger.set_system_log_level("debug")
+
         self.mimetic = Mimetic(
             study_id=self.study_id,
-            host=self.host,
-            port=self.mimetic_port,
             mirror_video=self.mirror_video,
             output_directory=self.output_directory,
             capture_thread=self.capture_thread,
@@ -79,36 +118,48 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 "pose": None
             },
             left_threshold=self.settings.left_threshold, right_threshold=self.settings.right_threshold,
+            alpha_map=self.alpha_map,
+            send_rate=self.send_rate,
+            send_threshold=self.send_threshold,
         )
-        self.mimetic_thread = None
-        self.calib_thread = None
-        self.main()
-        self.recorder_thread = None
 
-        self._log_pos = 0
+        self.dancer = Dancer(
+            host=self.host,
+            port=self.blossom_one_port,
+            logger=self.logger,
+             music_dir=self.music_directory,
+             analysis_interval=self.analysis_interval,
+        )
+        self.mimetic.update_sender("one", self.blossom_one_sender)
 
-        self.dancer = Dancer(host=self.host, port=self.dancer_port, logger=self.logger, music_dir=self.music_directory)
-        self.is_dancing = False
-        self.is_mimicking = False
-        self.logger.set_system_log_level("debug")
+    def on_blossom_type_changed(self, number: Literal["one", "two"]):
+        new_type = self.get_blossom_type(number)
+        sender = getattr(self, f"blossom_{number}_sender", None)
+        if sender:
+            sender.mode = new_type
+        self.logger(f"Blossom {number} type set to '{new_type}'.", level="debug")
+        sender = getattr(self, f"blossom_{number}_sender", None)
+        if new_type == "mimetic":
+            self.mimetic.update_sender(number, sender)
+        else :
+            self.mimetic.update_sender(number, None)
 
-    def main(self):
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.update_video_frame) # type: ignore
-        self.timer.start(30)
+    def get_blossom_type(self, number: Literal["one", "two"]) -> Literal["mimetic", "dancer"]:
+        combo = getattr(self, f"blossom_{number}_type", None)
+        value = combo.currentText().strip().lower() if combo else None
+        if value in ("mimetic", "dancer"):
+            return value
+        raise ValueError(f"Invalid Blossom Type: '{value}'")
 
-        self.pose_button.clicked.connect(self.toggle_pose_recognition)
-        self.calibrate_pose_button.clicked.connect(self.calibrate_pose)
-        self.recording_button.clicked.connect(self.toggle_recording)
-        self.mimetic_button.clicked.connect(self.toggle_mimetic_blossom)
-        self.reset_mimetic.clicked.connect(lambda: self.toggle_mimetic_blossom(action="reset"))
-        self.dancer_button.clicked.connect(self.toggle_dancer_blossom)
-        self.reset_dancer.clicked.connect(lambda: self.toggle_dancer_blossom(action="reset"))
-        self.menu_settings_button.triggered.connect(self.open_settings)
-        self.menu_exit_button.triggered.connect(self.close)
+    def get_controller_for_mode(self, mode: Literal["mimetic", "dancer"]) -> Optional[Mimetic | Dancer]:
+        if mode == "mimetic":
+            return self.mimetic
+        if mode == "dancer":
+            return self.dancer
 
     def open_settings(self):
-        if self.mimetic.is_running or (self.recorder_thread and self.recorder_thread.is_running):
+        if (self.mimetic.is_running or self.blossom_one_active or self.blossom_two_active or
+                (self.recorder_thread and self.recorder_thread.is_running)):
             QMessageBox.warning(
                 self,
                 "Settings Locked",
@@ -129,35 +180,73 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.mirror_video = new.mirror_video
         self.flip_blossom = new.flip_blossom
         changed_output_directory = (old.output_directory != new.output_directory)
+        changed_thresholds = old.left_threshold != new.left_threshold or old.right_threshold != new.right_threshold
+        changed_alpha_map = old.alpha_map != new.alpha_map
+        changed_send_rate = old.send_rate != new.send_rate
+        changed_send_threshold = old.send_threshold != new.send_threshold
 
-        try:
-            self.mimetic.update_threshold(new.left_threshold, new.right_threshold)
-        except Exception as e:
-            self.logger(f"Failed to apply thresholds: {e}", level="error")
+        if changed_thresholds:
+            try:
+                self.mimetic.update_threshold(new.left_threshold, new.right_threshold)
+                self.logger(f"Updated for new thresholds: {new.left_threshold}, {new.right_threshold}", level="info")
+            except Exception as e:
+                self.logger(f"Failed to apply thresholds: {e}", level="error")
 
-        self.host = new.host
-        self.mimetic_port = new.mimetic_port
-        self.mimetic.port = new.mimetic_port
-        self.mimetic.host = new.host
+        if changed_alpha_map:
+            self.mimetic.limiter.alpha_map = new.alpha_map
+            self.logger(f"Updated for new alpha_map: {new.alpha_map}", level="info")
 
-        self.dancer_port = new.dancer_port
-        self.dancer.port = new.dancer_port
-        self.dancer.host = new.host
+        if changed_send_rate:
+            self.mimetic.limiter.send_rate = new.send_rate
+            self.logger(f"Updated for new send_rate: {new.send_rate}", level="info")
+
+        if changed_send_threshold:
+            self.mimetic.limiter.send_threshold = new.send_threshold
+            self.logger(f"Updated for new send_threshold: {new.send_threshold}", level="info")
+
+        changed_host = (old.host != new.host)
+        changed_blossom_one_port = (old.blossom_one_port != new.blossom_one_port)
+        changed_blossom_two_port = (old.blossom_two_port != new.blossom_two_port)
+
+
+        changed_blossom_one_endpoint = changed_host or changed_blossom_one_port
+        changed_blossom_two_endpoint = changed_host or changed_blossom_two_port
+
+        if changed_host:
+            self.host = new.host
+            self.blossom_one_sender.host = new.host
+            self.blossom_two_sender.host = new.host
+            self.logger(f"Updated for new host: {new.host}", level="info")
+
+        one_type = self.get_blossom_type("one")
+        two_type = self.get_blossom_type("two")
+        blossom_one_attr = self.get_controller_for_mode(one_type)
+        blossom_two_attr = self.get_controller_for_mode(two_type)
+
+        if changed_blossom_one_endpoint:
+            self.blossom_one_port = new.blossom_one_port
+            if blossom_one_attr and hasattr(blossom_one_attr, "port"):
+                blossom_one_attr.port = new.blossom_one_port
+            self.blossom_one_sender.port = new.blossom_one_port
+            self.logger(f"Changed to new {one_type} endpoint: {new.host}:{new.blossom_one_port}", level="info")
+
+        if changed_blossom_two_endpoint:
+            self.blossom_two_port = new.blossom_two_port
+            if blossom_two_attr and hasattr(blossom_two_attr, "port"):
+                blossom_two_attr.port = new.blossom_two_port
+            self.blossom_two_sender.port = new.blossom_two_port
+            self.logger(f"Changed to new {two_type} endpoint: {new.host}:{new.blossom_two_port}", level="info")
 
         if changed_output_directory:
-            self.logger("Reconfiguring output directory...", level="info")
-            self.logger(f"creating output directory at {new.output_directory}", level="debug")
             subprocess.run(["mkdir", "-p", new.output_directory])
-            self.logger(f"Moving... 'mv {self.output_directory}/{self.study_id} {new.output_directory}'", level="debug")
+            self.logger(f"created output directory at {new.output_directory}", level="debug")
             subprocess.run(["mv", f"{self.output_directory}/{self.study_id}", new.output_directory])
+            self.logger(f"Moved.. 'mv {self.output_directory}/{self.study_id} {new.output_directory}'", level="debug")
             self.output_directory = new.output_directory
-            self.logger("Updating pose logging directory...", level="debug")
             self.mimetic.update_output_directory(new.output_directory)
+            self.logger("Updated pose logging directory...", level="debug")
             self.logger(f"Output directory successfully changed to {self.output_directory}/{self.study_id}", level="info")
             self.logger.output_path = f"{self.output_directory}/{self.study_id}/system_log.json"
-
-        if self.recorder_thread and self.recorder_thread.is_running:
-            self.logger("Output folder changed; will apply to the next recording.", level="warning")
 
         self.logger("Settings applied.", level="info")
 
@@ -179,11 +268,19 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.cam_feed.setPixmap(scaled_pixmap)
 
     def closeEvent(self, event):
+        if self.blossom_one_sender.is_alive():
+            self.blossom_one_sender.stop()
+            self.blossom_one_sender.join()
+        if self.blossom_two_sender.is_alive():
+            self.blossom_two_sender.stop()
+            self.blossom_two_sender.join()
+
         if self.capture_thread:
             self.capture_thread.stop()
             self.capture_thread.join()
-        if self.mimetic.is_running:
+        if self.mimetic and self.mimetic.is_running:
             self.mimetic.stop()
+        if self.mimetic_thread:
             self.mimetic_thread.stop()
             self.mimetic_thread.wait()
 
@@ -227,10 +324,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.logger("Pose recognition already stopped", level="warning")
                 return
             self.logger("Stopping Pose Recognition...", level="info")
-            if self.mimetic.is_sending:
-                self.mimetic.stop_sending()
+            if self.mimetic.is_sending_one or self.mimetic.is_sending_two:
+                if self.get_blossom_type("one") == "mimetic":
+                    self.mimetic.stop_sending(blossom_sender=self.blossom_one_sender, number="one")
+
+                if self.get_blossom_type("two") == "mimetic":
+                    self.mimetic.stop_sending(blossom_sender=self.blossom_two_sender, number="two")
             self.mimetic.stop()
             self.mimetic_thread.stop()
+            self.mimetic_thread.wait()
             self.pose_button.setText("Start Pose Recognition")
 
 
@@ -258,7 +360,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         def clear_gaze_indicator():
             for indicator in indicators.values():
                 indicator.setChecked(False)
-            
+
         def format_val(val: float, suffix: str = '') -> str:
             return f"{val:.2f}{suffix}" if val is not None else "--"
 
@@ -275,7 +377,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         else:
             clear_gaze_indicator()
             self._last_gaze_label = None
-                
+
         axis = data.get("axis")
         if axis is not None:
             pitch, roll, yaw = axis.get("pitch"), axis.get("roll"), axis.get("yaw")
@@ -308,81 +410,114 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.blossom_ears_value.setText(format_val(e))
         self.data_sent.setChecked(bool(data_sent))
 
-    def launch_blossom(self, blossom_type: str):
-        attr = f"{blossom_type}_launcher"
-        proc_attr = f"{blossom_type}_server_process"
+    def launch_blossom(self, mode: Literal["mimetic", "dancer"], number: Literal["one", "two"]):
+        attr = f"blossom_{number}_launcher"
+        proc_attr = f"blossom_{number}_server_process"
 
-        if hasattr(self, attr) and getattr(self, attr).isRunning():
-            self.logger(f"{blossom_type.capitalize()} Blossom server is already starting or running.", level="warning")
+        if getattr(self, attr) is not None and getattr(self, attr).isRunning():
+            self.logger(f"{mode.capitalize()} Blossom {number.capitalize()} server is already starting or running.", level="warning")
             return
+        port = getattr(self.settings, f"blossom_{number}_port")
+        device = getattr(self.settings, f"blossom_{number}_device")
 
-        launcher = BlossomServerLauncher(host=self.host, ports={"mimetic": self.mimetic_port, "dancer": self.dancer_port},
-                                         logger=self.logger, blossom_type=blossom_type)
+        launcher = BlossomServerLauncher(host=self.host, port=port, usb=device,
+                                         logger=self.logger, number=number)
+
         setattr(self, attr, launcher)
 
+
         def on_ready():
+            blossom_attr = getattr(self, mode, None)
             if launcher.success:
-                self.logger(f"{blossom_type.capitalize()} Blossom server started successfully.")
+                self.logger(f"{mode.capitalize()} Blossom server started successfully.")
                 setattr(self, proc_attr, launcher.server_proc)
-                if blossom_type == "mimetic":
-                    self.logger("Mimetic Blossom server is ready. Starting sender thread.", level="info")
-                    self.mimetic.start_sending()
+                self.logger(f"{str(mode).upper()} Blossom {number.capitalize()} server is ready. Starting sender thread.", level="info")
+                if blossom_attr: # and hasattr(blossom_attr, "start_sending"):
+                    setattr(self, f"blossom_{number}_sender", BlossomSenderThread(host=self.host, port=port, logger=self.logger,
+                                        mode=self.get_blossom_type(number)))
+                    sender = getattr(self, f"blossom_{number}_sender")
+                    blossom_attr.start_sending(blossom_sender=sender, number=number)
+                else:
+                    self.logger(f"{mode.capitalize()} controller not available to start sending.",
+                                level="warning")
 
             else:
-                if hasattr(self, "mimetic_launcher") and self.mimetic_launcher.init_allowed:
-                    self.logger(f"Failed to start {blossom_type.capitalize()} Blossom server.", level="error")
+                if hasattr(self, attr) and getattr(self, attr).init_allowed:
+                    self.logger(f"Failed to start {mode.capitalize()} Blossom server.", level="error")
 
         launcher.finished.connect(on_ready)
         launcher.start()
 
-    def send_blossom_command(self, blossom_type: str, command: str):
-        proc = getattr(self, f"{blossom_type}_server_process", None)
+    def send_blossom_command(self, number: Literal["one", "two"], command: str):
+        proc = getattr(self, f"blossom_{number}_server_process")
 
         if proc is None or proc.stdin is None or proc.poll() is not None:
-            self.logger(f"Cannot send command: {blossom_type.capitalize()} server not running or stdin closed.",
+            self.logger(f"Cannot send command: Blossom {number.capitalize()} server not running or stdin closed.",
                         level="error")
             return
 
         try:
             proc.stdin.write((command + "\n").encode())
             proc.stdin.flush()
-            self.logger(f"Sent '{command}' to {blossom_type.capitalize()} Blossom server.")
+            self.logger(f"Sent '{command}' to {number.capitalize()} Blossom server.")
         except Exception as e:
-            self.logger(f"Failed to send '{command}' to {blossom_type.capitalize()}: {e}", level="error")
+            self.logger(f"Failed to send '{command}' to {number.capitalize()}: {e}", level="error")
 
-    def toggle_mimetic_blossom(self, action: Literal["start", "stop", "reset"] = None):
+    def toggle_blossom(self, number: Literal["one", "two"], action: Literal["start", "stop", "reset"] = None):
+        # Attribute names
+        active_attr = f"blossom_{number}_active"
+        type_name = self.get_blossom_type(number)
+        launcher_attr = f"blossom_{number}_launcher"
+        server_proc_attr = f"blossom_{number}_server_process"
+        sender_attr = f"blossom_{number}_sender"
 
-        m = self.mimetic
+        # Objects
+        button = getattr(self, f"blossom_{number}_button")
+        controller = self.get_controller_for_mode(mode=type_name)
+        combo = getattr(self, f"blossom_{number}_type")
 
         def start():
-            self.is_mimicking = True
-            self.launch_blossom("mimetic")
-            self.mimetic_button.setText("Stop Mimetic")
+            combo.setEnabled(False)
+            setattr(self, active_attr, True)
+            self.launch_blossom(type_name, number)
+            button.setText("Stop")  # type: ignore
 
         def stop():
-            self.is_mimicking = False
+            setattr(self, active_attr, False)
+            if hasattr(self, launcher_attr):
+                launcher = getattr(self, launcher_attr)
+                if launcher and launcher.isRunning():
+                    launcher.init_allowed = False
+                    self.logger(f"Canceled Blossom {number.capitalize()} server initialization....", level="info")
+                if getattr(launcher, "success") and controller:
+                    sender =  getattr(self, f"blossom_{number}_sender")
+                    if getattr(controller, f"is_sending_{number}"):
+                        controller.stop_sending(blossom_sender=sender, number=number)
+                        self.logger(f"{type_name.capitalize()} sending stopped.", level="info")
+                    self.send_blossom_command(number, "q")
+            self.logger(f"Blossom {number.capitalize()} server stopped...", level="info")
+            combo.setEnabled(True)
 
-            if hasattr(self, "mimetic_launcher") and self.mimetic_launcher.isRunning():
-                self.logger("Cancelling Mimetic Blossom server initialization...", level="info")
-                self.mimetic_launcher.init_allowed = False
-                if self.mimetic_launcher.success:
-                    m.stop_sending()
-                    self.send_blossom_command("mimetic", "q")
+            if hasattr(self, server_proc_attr):
+                proc = getattr(self, server_proc_attr)
+                if proc:
+                    proc.terminate()
+                    setattr(self, server_proc_attr, None)
 
-            if self.mimetic_server_process:
-                self.mimetic_server_process.terminate()
-                self.mimetic_server_process = None
-
-            self.mimetic_button.setText("Start Mimetic")
+            button.setText("Start")
 
         def reset():
-            if self.is_mimicking:
-                self.logger(f"Resetting Mimetic Blossom...", level="warning")
-                if self.mimetic.is_sending:
-                    self.logger("Sending reset command and stopping blossom sending process", level="debug")
-                    self.send_blossom_command("mimetic", "reset")
-                    m.stop_sending()
+            if getattr(self, active_attr, False) and controller:
+                self.logger(f"Resetting Blossom {number.capitalize()}...", level="warning")
+                # if getattr(controller, "is_sending"):
+                self.logger(
+                    f"Sending reset command and stopping blossom {type_name.capitalize()} sending process",
+                    level="info"
+                )
+                self.send_blossom_command(number, "reset")
                 QTimer.singleShot(100, stop)
+            else:
+                self.logger(f"Blossom {number.capitalize()} server is not active.", level="warning")
 
         if action == "start":
             start()
@@ -391,7 +526,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         elif action == "reset":
             reset()
         else:
-            (stop if self.is_mimicking else start)()
+            (stop if getattr(self, active_attr, False) else start)()
 
     def toggle_recording(self):
         def start_recording():
@@ -477,35 +612,3 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if at_bottom:
             self.terminal_output.moveCursor(self.terminal_output.textCursor().MoveOperation.End)
             self.terminal_output.ensureCursorVisible()
-
-    def toggle_dancer_blossom(self, action: Literal["start", "stop", "reset"] = None):
-        def start():
-            self.logger("Starting dancer...", level="info")
-            QTimer.singleShot(100, lambda: self.launch_blossom("dancer"))
-            self.dancer.start()
-            self.is_dancing = True
-            self.dancer_button.setText("Stop Dancer")
-
-        def stop():
-            if not self.dancer.is_running:
-                self.logger("Dancer already stopped", level="warning")
-                return
-            self.logger("Stopping Dancer...", level="info")
-
-            self.dancer.stop()
-            self.is_dancing = False
-            self.dancer_button.setText("Start Dancer")
-            self.send_blossom_command("dancer", "q")
-
-        def reset():
-            self.send_blossom_command("dancer", "reset")
-            QTimer.singleShot(100, lambda: stop())
-
-        if action == "start":
-            start()
-        elif action == "stop":
-            stop()
-        elif action == "reset":
-            reset()
-        else:
-            (stop if self.is_dancing else start)()
