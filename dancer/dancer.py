@@ -16,7 +16,7 @@ from src.threads.blossom_sender import BlossomSenderThread
 
 
 class Dancer:
-    def __init__(self, host: str, port: int, music_dir: str, logger: Logger, blossom_sender: BlossomSenderThread = None, analysis_interval: float = 5.0):
+    def __init__(self, music_dir: str, logger: Logger, analysis_interval: float = 5.0):
         """
         :param music_dir: Path to the music directory
         :param analysis_interval: Interval in seconds to re-analyze mood
@@ -28,16 +28,12 @@ class Dancer:
         self.dancer_server_proc = None
         self.current_sequence = None
         self.is_running = False
-        self.host = host
-        self.port = port
         self.logger = logger
-        self.blossom_one_sender = None
-        self.blossom_two_sender = None
-        self.is_sending_one = False
-        self.is_sending_two = False
+        self.blossom_one_sender = self.blossom_two_sender = None
+        self.is_sending_one = self.is_sending_two = False
 
 
-    def analyse_music(self, music_path: str):
+    def analyse_music(self, music_path: str, blossom_sender: BlossomSenderThread):
         """Analyse music file in segments and send mood-based sequences."""
         music_duration = librosa.get_duration(path=music_path)
         current_time = 0.0
@@ -54,7 +50,7 @@ class Dancer:
                     duration = self._get_sequence_duration(sequence)
                     if duration is not None:
                         payload = {"sequence": sequence, "duration": duration}
-                        self.blossom_sender_thread.send(payload)
+                        blossom_sender.send(payload)
                         self.current_sequence = sequence
                         self.logger(f"[Dancer] Mood -> '{sequence}', ({duration:.2f})s", level="debug")
 
@@ -66,7 +62,7 @@ class Dancer:
     def start(self, blossom_sender: BlossomSenderThread):
         """Start the dancer and continuously adjust mood based on the music."""
         self.logger("[Dancer] Launching Dancer...", level="info")
-        self.blossom_sender_thread.start()
+        blossom_sender.start()
         self.is_running = True
 
         for music_file in os.listdir(self.music_dir):
@@ -74,9 +70,9 @@ class Dancer:
                 break
 
             music_file_path = os.path.join(self.music_dir, music_file)
-            self.analyse_music(music_file_path)
+            self.analyse_music(music_file_path, blossom_sender)
 
-        self.stop()
+        blossom_sender.stop()
 
 
 

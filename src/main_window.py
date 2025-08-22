@@ -124,8 +124,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         )
 
         self.dancer = Dancer(
-            host=self.host,
-            port=self.blossom_one_port,
             logger=self.logger,
              music_dir=self.music_directory,
              analysis_interval=self.analysis_interval,
