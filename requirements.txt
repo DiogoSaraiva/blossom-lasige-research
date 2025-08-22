@@ -21,10 +21,10 @@ ikpy==3.0.1
 # MediaPipe + OpenCV
 ############################
 mediapipe~=0.10.14
-opencv-contrib-python==4.8.0.74
+# opencv-contrib-python==4.8.0.74
 
 ############################
-# Ciência / NumPy Stack
+# Science / NumPy Stack
 ############################
 numpy==1.26.4
 scipy==1.13.0
@@ -34,7 +34,7 @@ matplotlib~=3.10.3
 pandas
 
 ############################
-# Utilitários
+# Utilities
 ############################
 requests==2.32.4
 requests-toolbelt==0.9.1
@@ -50,4 +50,8 @@ configargparse
 
 
 PyQt6~=6.9.1
+############################
+# Audio
+############################
 librosa
+sounddevice

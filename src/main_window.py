@@ -266,12 +266,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.cam_feed.setPixmap(scaled_pixmap)
 
     def closeEvent(self, event):
-        if self.blossom_one_sender.is_alive():
-            self.blossom_one_sender.stop()
-            self.blossom_one_sender.join()
-        if self.blossom_two_sender.is_alive():
-            self.blossom_two_sender.stop()
-            self.blossom_two_sender.join()
+        if self.blossom_one_sender:
+            self.toggle_blossom(action="reset", number="one")
+        if self.blossom_two_sender:
+            self.toggle_blossom(action="reset", number="two")
 
         if self.capture_thread:
             self.capture_thread.stop()
@@ -494,6 +492,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                         controller.stop_sending(blossom_sender=sender, number=number)
                         self.logger(f"{type_name.capitalize()} sending stopped.", level="info")
                     self.send_blossom_command(number, "q")
+
+                    sender.stop()
+                    sender.join()
+
             self.logger(f"Blossom {number.capitalize()} server stopped...", level="info")
             combo.setEnabled(True)
 
