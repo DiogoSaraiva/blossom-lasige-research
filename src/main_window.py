@@ -436,6 +436,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     setattr(self, f"blossom_{number}_sender", BlossomSenderThread(host=self.host, port=port, logger=self.logger,
                                         mode=self.get_blossom_type(number)))
                     sender = getattr(self, f"blossom_{number}_sender")
+                    blossom_attr.update_sender(blossom_sender=sender, number=number)
                     blossom_attr.start_sending(blossom_sender=sender, number=number)
                 else:
                     self.logger(f"{mode.capitalize()} controller not available to start sending.",

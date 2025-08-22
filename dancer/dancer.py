@@ -1,6 +1,7 @@
 import os
 import time
 from pathlib import Path
+from typing import Literal
 
 import librosa
 import numpy as np
@@ -30,7 +31,10 @@ class Dancer:
         self.host = host
         self.port = port
         self.logger = logger
-        self.blossom_sender_thread = blossom_sender or BlossomSenderThread(host=self.host, port=self.port, logger = self.logger, mode = "sequence")
+        self.blossom_one_sender = None
+        self.blossom_two_sender = None
+        self.is_sending_one = False
+        self.is_sending_two = False
 
 
     def analyse_music(self, music_path: str):
@@ -59,7 +63,7 @@ class Dancer:
         except Exception as e:
             pass
 
-    def start(self):
+    def start(self, blossom_sender: BlossomSenderThread):
         """Start the dancer and continuously adjust mood based on the music."""
         self.logger("[Dancer] Launching Dancer...", level="info")
         self.blossom_sender_thread.start()
@@ -74,32 +78,17 @@ class Dancer:
 
         self.stop()
 
-    def send_sequence(self, sequence_str: str) -> bool:
-        """Send sequence directly to the Dancer server (bypassing BlossomSenderThread)."""
-        url = f"http://{self.host}:{self.port}/sequence"
-        self.logger(f"[Dancer] Sending sequence to {url}: {sequence_str}", level="info")
 
-        try:
-            response = requests.post(url, data=sequence_str)
-            if response.status_code == 200:
-                self.logger(f"[Dancer] Sequence '{sequence_str}' sent successfully!", level="debug")
-                return True
-            else:
-                self.logger(f"[Dancer] Received status code {response.status_code}", level="error")
-                return False
-        except requests.exceptions.RequestException as e:
-            self.logger(f"[ERROR] Failed to send sequence '{sequence_str}': {e}", level="error")
-            return False
 
-    def stop(self):
+    def stop(self, blossom_sender: BlossomSenderThread):
         """Stop the dancer and shut down the sender thread."""
         if not self.is_running:
             return
 
         self.is_running = False
         try:
-            self.blossom_sender_thread.stop()
-            self.blossom_sender_thread.join(timeout=1.0)
+            blossom_sender.stop()
+            blossom_sender.join(timeout=1.0)
         except Exception as e:
             self.logger(f"[Dancer] Error stopping sender thread: {e}", level="error")
 
@@ -164,9 +153,35 @@ class Dancer:
                 self.logger(f"[Dancer] Mood changed -> '{sequence}'", level="info")
 
                 # Send to Blossom
-                self.blossom_sender_thread.send({"sequence": sequence, "duration": self.analysis_interval})
+                if self.is_sending_one:
+                    self.blossom_one_sender.send(sequence)
+                if self.is_sending_two:
+                    self.blossom_two_sender.send(sequence)
+
+
 
             else:
                 self.logger(f"[Dancer] Mood unchanged: '{sequence}'", level="debug")
 
         self.logger("[Dancer] Dancer stopped.", level="info")
+
+    def update_sender(self, number: Literal["one", "two"], blossom_sender: BlossomSenderThread | None):
+        setattr(self, f"blossom_{number}_sender", blossom_sender)
+
+
+    def start_sending(self, blossom_sender: BlossomSenderThread, number: Literal["one", "two"]):
+        if getattr(self, f"is_sending_{number}"):
+            self.logger(f"[Dancer] Sending already enabled for Blossom {number}.", level="warning")
+            return
+        setattr(self, f"is_sending_{number}", True)
+        blossom_sender.start()
+
+
+    def stop_sending(self, blossom_sender: BlossomSenderThread, number: Literal["one", "two"]):
+        if not getattr(self, f"is_sending_{number}"):
+            self.logger(f"[Dancer] Sending not enabled for Blossom {number}.", level="warning")
+            return
+        setattr(self, f"is_sending_{number}", False)
+        blossom_sender.stop()
+        blossom_sender.join()
+
