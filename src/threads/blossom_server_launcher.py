@@ -7,7 +7,7 @@ import requests
 from PyQt6.QtCore import QThread
 
 class BlossomServerLauncher(QThread):
-    def __init__(self, logger, host, port: int, blossom_type: Literal["mimetic", "dancer"], usb: str):
+    def __init__(self, logger, host, port: int, number: Literal["one", "two"], usb: str):
         super().__init__()
         self.logger = logger
         self.host = host
@@ -15,7 +15,7 @@ class BlossomServerLauncher(QThread):
         self.usb = usb
         self.server_proc = None
         self.success = False
-        self.blossom_type = blossom_type
+        self.number = number
         self.init_allowed = True
         self.url = f"http://{self.host}:{self.port}/"
 
@@ -66,7 +66,7 @@ class BlossomServerLauncher(QThread):
 
     def run(self):
         try:
-            self.logger(f"[BlossomLauncher]  Launching blossom_public/start.py ({self.blossom_type.upper()} at {self.url})...", level="info")
+            self.logger(f"[BlossomLauncher]  Launching blossom_public/start.py ({self.number.upper()} at {self.url})...", level="info")
             self.kill_if_using_port()
             self.server_proc = subprocess.Popen([
                 "python", "blossom_public/start.py",
@@ -78,12 +78,12 @@ class BlossomServerLauncher(QThread):
             ], stdin=subprocess.PIPE)
 
             if not self.wait_for_server_ready() and self.init_allowed:
-                self.logger(f"[BlossomLauncher] Blossom server ({self.blossom_type.upper()}) failed to start at {self.url}.", level="error")
+                self.logger(f"[BlossomLauncher] Blossom server ({self.number.upper()}) failed to start at {self.url}.", level="error")
                 if self.server_proc: self.server_proc.terminate()
                 return
             if not self.init_allowed:
                 return
             self.success = True
-            self.logger(f"[BlossomLauncher] Blossom server ({self.blossom_type.upper()}) started successfully at {self.url}.")
+            self.logger(f"[BlossomLauncher] Blossom server ({self.number.upper()}) started successfully at {self.url}.")
         except Exception as e:
             self.logger(f"[BlossomLauncher] Exception while starting Blossom server at {self.url}: {e}", level="error")

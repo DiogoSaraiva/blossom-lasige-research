@@ -21,7 +21,7 @@ class MotionLimiter:
     def __init__(self, logger: Logger, alpha_map: dict=None, send_rate: int=5, threshold: float=2.0, ):
         self.logger = logger
         # Higher alpha value - Less filtered, lower time to respond
-        # Less alpha value - More filtered, higher time to respond
+        # Less alpha value - More filtered, higher time to respondr
         self.alpha_map = alpha_map or {
             "x": 0.4,  # pitch
             "y": 0.4,  # roll

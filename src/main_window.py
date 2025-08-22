@@ -33,7 +33,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.blossom_two_type.currentTextChanged.connect(lambda: self.on_blossom_type_changed("two"))
 
         self._last_gaze_label = None
-        self.mimetic_server_process = None
+
+        self.blossom_one_active = False
+        self.blossom_two_active = False
+        self.blossom_one_server_process = None
+        self.blossom_two_server_process = None
+        self.blossom_one_launcher = None
+        self.blossom_two_launcher = None
 
         self.setWindowTitle("Blossom LASIGE Research")
         self.timer = QTimer()
@@ -76,8 +82,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.logger("Failed to retrieve frame resolution in time.", level="error")
             self.frame_height, self.frame_width = 480, 640  # fallback default
 
-        self.blossom_one_sender = BlossomSenderThread(host=self.host, port=self.blossom_one_port, logger=self.logger, mode=self.get_blossom_type("one"))
-        self.blossom_two_sender = BlossomSenderThread(host=self.host, port=self.blossom_two_port, logger=self.logger, mode=self.get_blossom_type("two"))
+        self.blossom_one_sender = None
+        self.blossom_two_sender = None
 
         self.mimetic_thread = None
         self.calib_thread = None
@@ -102,9 +108,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.logger.set_system_log_level("debug")
 
-        self.blossom_one_active = False
-        self.blossom_two_active = False
-
         self.mimetic = Mimetic(
             study_id=self.study_id,
             mirror_video=self.mirror_video,
@@ -120,11 +123,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             send_threshold=self.send_threshold,
         )
 
-        # self.dancer = Dancer(
-        #     logger=self.logger,
-        #      music_dir=self.music_directory,
-        #      analysis_interval=self.analysis_interval,
-        # )
+        self.dancer = Dancer(
+            host=self.host,
+            port=self.blossom_one_port,
+            logger=self.logger,
+             music_dir=self.music_directory,
+             analysis_interval=self.analysis_interval,
+        )
         self.mimetic.update_sender("one", self.blossom_one_sender)
 
     def on_blossom_type_changed(self, number: Literal["one", "two"]):
@@ -144,7 +149,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         value = combo.currentText().strip().lower() if combo else None
         if value in ("mimetic", "dancer"):
             return value
-        raise ValueError(f"Tipo inválido de Blossom: '{value}'")
+        raise ValueError(f"Invalid Blossom Type: '{value}'")
 
     def get_controller_for_mode(self, mode: Literal["mimetic", "dancer"]) -> Optional[Mimetic | Dancer]:
         if mode == "mimetic":
@@ -319,12 +324,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.logger("Pose recognition already stopped", level="warning")
                 return
             self.logger("Stopping Pose Recognition...", level="info")
-            if self.mimetic.is_sending:
+            if self.mimetic.is_sending_one or self.mimetic.is_sending_two:
                 if self.get_blossom_type("one") == "mimetic":
-                    self.mimetic.stop_sending(blossom_sender=self.blossom_one_sender)
+                    self.mimetic.stop_sending(blossom_sender=self.blossom_one_sender, number="one")
 
                 if self.get_blossom_type("two") == "mimetic":
-                    self.mimetic.stop_sending(blossom_sender=self.blossom_two_sender)
+                    self.mimetic.stop_sending(blossom_sender=self.blossom_two_sender, number="two")
             self.mimetic.stop()
             self.mimetic_thread.stop()
             self.mimetic_thread.wait()
@@ -405,55 +410,58 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.blossom_ears_value.setText(format_val(e))
         self.data_sent.setChecked(bool(data_sent))
 
-    def launch_blossom(self, blossom_type: Literal["mimetic", "dancer"], number: Literal["one", "two"]):
+    def launch_blossom(self, mode: Literal["mimetic", "dancer"], number: Literal["one", "two"]):
         attr = f"blossom_{number}_launcher"
         proc_attr = f"blossom_{number}_server_process"
 
-        if hasattr(self, attr) and getattr(self, attr).isRunning():
-            self.logger(f"{blossom_type.capitalize()} Blossom {number.capitalize()} server is already starting or running.", level="warning")
+        if getattr(self, attr) is not None and getattr(self, attr).isRunning():
+            self.logger(f"{mode.capitalize()} Blossom {number.capitalize()} server is already starting or running.", level="warning")
             return
         port = getattr(self.settings, f"blossom_{number}_port")
         device = getattr(self.settings, f"blossom_{number}_device")
 
-        launcher = BlossomServerLauncher(host=self.host, port=port, usb=device ,
-                                         logger=self.logger, blossom_type=blossom_type)
+        launcher = BlossomServerLauncher(host=self.host, port=port, usb=device,
+                                         logger=self.logger, number=number)
+
         setattr(self, attr, launcher)
 
 
         def on_ready():
-            blossom_attr = getattr(self, blossom_type, None)
+            blossom_attr = getattr(self, mode, None)
             if launcher.success:
-                self.logger(f"{blossom_type.capitalize()} Blossom server started successfully.")
+                self.logger(f"{mode.capitalize()} Blossom server started successfully.")
                 setattr(self, proc_attr, launcher.server_proc)
-                self.logger(f"{str(blossom_type).upper()} Blossom {number.capitalize()} server is ready. Starting sender thread.", level="info")
-                if blossom_attr and hasattr(blossom_attr, "start_sending"):
+                self.logger(f"{str(mode).upper()} Blossom {number.capitalize()} server is ready. Starting sender thread.", level="info")
+                if blossom_attr: # and hasattr(blossom_attr, "start_sending"):
+                    setattr(self, f"blossom_{number}_sender", BlossomSenderThread(host=self.host, port=port, logger=self.logger,
+                                        mode=self.get_blossom_type(number)))
                     sender = getattr(self, f"blossom_{number}_sender")
-                    blossom_attr.start_sending(blossom_sender=sender)
+                    blossom_attr.start_sending(blossom_sender=sender, number=number)
                 else:
-                    self.logger(f"{blossom_type.capitalize()} controller not available to start sending.",
+                    self.logger(f"{mode.capitalize()} controller not available to start sending.",
                                 level="warning")
 
             else:
-                if hasattr(self, "mimetic_launcher") and self.mimetic_launcher.init_allowed:
-                    self.logger(f"Failed to start {blossom_type.capitalize()} Blossom server.", level="error")
+                if hasattr(self, attr) and getattr(self, attr).init_allowed:
+                    self.logger(f"Failed to start {mode.capitalize()} Blossom server.", level="error")
 
         launcher.finished.connect(on_ready)
         launcher.start()
 
-    def send_blossom_command(self, blossom_type: str, command: str):
-        proc = getattr(self, f"{blossom_type}_server_process", None)
+    def send_blossom_command(self, number: Literal["one", "two"], command: str):
+        proc = getattr(self, f"blossom_{number}_server_process")
 
         if proc is None or proc.stdin is None or proc.poll() is not None:
-            self.logger(f"Cannot send command: {blossom_type.capitalize()} server not running or stdin closed.",
+            self.logger(f"Cannot send command: Blossom {number.capitalize()} server not running or stdin closed.",
                         level="error")
             return
 
         try:
             proc.stdin.write((command + "\n").encode())
             proc.stdin.flush()
-            self.logger(f"Sent '{command}' to {blossom_type.capitalize()} Blossom server.")
+            self.logger(f"Sent '{command}' to {number.capitalize()} Blossom server.")
         except Exception as e:
-            self.logger(f"Failed to send '{command}' to {blossom_type.capitalize()}: {e}", level="error")
+            self.logger(f"Failed to send '{command}' to {number.capitalize()}: {e}", level="error")
 
     def toggle_blossom(self, number: Literal["one", "two"], action: Literal["start", "stop", "reset"] = None):
         # Attribute names
@@ -461,10 +469,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         type_name = self.get_blossom_type(number)
         launcher_attr = f"blossom_{number}_launcher"
         server_proc_attr = f"blossom_{number}_server_process"
+        sender_attr = f"blossom_{number}_sender"
 
         # Objects
         button = getattr(self, f"blossom_{number}_button")
-        controller = self.get_controller_for_mode(type_name)
+        controller = self.get_controller_for_mode(mode=type_name)
         combo = getattr(self, f"blossom_{number}_type")
 
         def start():
@@ -480,11 +489,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 if launcher and launcher.isRunning():
                     launcher.init_allowed = False
                     self.logger(f"Canceled Blossom {number.capitalize()} server initialization....", level="info")
-                    if getattr(launcher, "success", False) and controller:
-                        sender =  getattr(self, f"blossom_{number}_sender")
-                        controller.stop_sending(sender)
-                        self.send_blossom_command(type_name, "q")
-            self.logger(f"Blossom {number.capitalize()} server stopped...")
+                if getattr(launcher, "success") and controller:
+                    sender =  getattr(self, f"blossom_{number}_sender")
+                    if getattr(controller, f"is_sending_{number}"):
+                        controller.stop_sending(blossom_sender=sender, number=number)
+                        self.logger(f"{type_name.capitalize()} sending stopped.", level="info")
+                    self.send_blossom_command(number, "q")
+            self.logger(f"Blossom {number.capitalize()} server stopped...", level="info")
             combo.setEnabled(True)
 
             if hasattr(self, server_proc_attr):
@@ -498,12 +509,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         def reset():
             if getattr(self, active_attr, False) and controller:
                 self.logger(f"Resetting Blossom {number.capitalize()}...", level="warning")
-                if getattr(controller, "is_sending", False):
-                    self.logger(
-                        f"Sending reset command and stopping blossom {number.capitalize()} sending process",
-                        level="debug"
-                    )
-                    self.send_blossom_command(type_name, "reset")
+                # if getattr(controller, "is_sending"):
+                self.logger(
+                    f"Sending reset command and stopping blossom {type_name.capitalize()} sending process",
+                    level="info"
+                )
+                self.send_blossom_command(number, "reset")
                 QTimer.singleShot(100, stop)
             else:
                 self.logger(f"Blossom {number.capitalize()} server is not active.", level="warning")

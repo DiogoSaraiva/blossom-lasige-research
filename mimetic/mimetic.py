@@ -17,7 +17,7 @@ class Mimetic:
     def __init__(self, output_directory: str, study_id: str | int, mirror_video: bool,
                  capture_thread: FrameCaptureThread, logger: dict[str, Logger], alpha_map: dict[str, float],
                  send_rate: int, send_threshold: float,
-                 left_threshold: float = 0.45, right_threshold: float = 0.55,):
+                 left_threshold: float = 0.45, right_threshold: float = 0.55):
         self._stop_event = threading.Event()
         self._thread = None
         self.output_directory = output_directory or "./output"
@@ -35,10 +35,11 @@ class Mimetic:
         self.cam_view_title = "Pose Estimation" + (" (Mirrored)" if self.mirror_video else "")
         self.is_running = False
         self.angle_offset = {"pitch": 0, "roll": 0, "yaw": 0}
-        self.blossom_sender_one = None
-        self.blossom_sender_two = None
+        self.blossom_one_sender = None
+        self.blossom_two_sender = None
         self.mp_thread = None
-        self.is_sending = False
+        self.is_sending_one = False
+        self.is_sending_two = False
         self.data = {}
 
         self.left_threshold = left_threshold
@@ -46,7 +47,7 @@ class Mimetic:
 
 
     def update_sender(self, number: Literal["one", "two"], blossom_sender: BlossomSenderThread | None):
-        setattr(self, f"blossom_sender_{number}", blossom_sender)
+        setattr(self, f"blossom_{number}_sender", blossom_sender)
 
     def _main_loop(self):
         self.is_running = True
@@ -137,14 +138,19 @@ class Mimetic:
                 self.pose_logger(self.data)
 
                 # Send data to Blossom if needed
-                if self.is_sending and should_send:
+                if self.is_sending_one and should_send:
                     try:
-                        if getattr(self, "blossom_sender_one", None) is not None:
-                            self.blossom_sender_one.send(payload)
-                        if getattr(self, "blossom_sender_two", None) is not None:
-                            self.blossom_sender_two.send(payload)
+                        if self.blossom_one_sender is not None:
+                            self.blossom_one_sender.send(payload)
                     except Exception as e:
                         self.logger(f"[Mimetic] Error sending to Blossom: {e}", level="error")
+                if self.is_sending_two and should_send:
+                    try:
+                        if self.blossom_two_sender is not None:
+                            self.blossom_two_sender.send(payload)
+                    except Exception as e:
+                        self.logger(f"[Mimetic] Error sending to Blossom: {e}", level="error")
+
                 frame_elapsed_time = time.time() - frame_start_time
                 sleep_time = max(0.0, frame_duration - frame_elapsed_time)
                 if sleep_time > 0:
@@ -162,23 +168,24 @@ class Mimetic:
         if self.is_running:
             self.mp_thread = MediaPipeThread(result_buffer=self.pose_buffer, logger=self.logger,
                                          left_threshold=self.left_threshold, right_threshold=self.right_threshold)
+
     def update_output_directory(self, directory):
         self.output_directory = directory
         self.pose_logger = Logger(f"{directory}/{self.study_id}/pose_log.json", mode="pose")
 
-    def start_sending(self, blossom_sender: BlossomSenderThread):
-        if self.is_sending:
-            self.logger("[Mimetic] Sending already enabled.", level="warning")
+    def start_sending(self, blossom_sender: BlossomSenderThread, number: Literal["one", "two"]):
+        if getattr(self, f"is_sending_{number}"):
+            self.logger(f"[Mimetic] Sending already enabled for Blossom {number}.", level="warning")
             return
+        setattr(self, f"is_sending_{number}", True)
         blossom_sender.start()
-        self.is_sending = True
 
-    def stop_sending(self, blossom_sender: BlossomSenderThread):
-        if not self.is_sending:
-            self.logger(f"[Mimetic] Sending not enabled.", level="warning")
+
+    def stop_sending(self, blossom_sender: BlossomSenderThread, number: Literal["one", "two"]):
+        if not getattr(self, f"is_sending_{number}"):
+            self.logger(f"[Mimetic] Sending not enabled for Blossom {number}.", level="warning")
             return
-        self.is_sending = False
-
+        setattr(self, f"is_sending_{number}", False)
         blossom_sender.stop()
         blossom_sender.join()
 

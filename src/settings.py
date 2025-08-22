@@ -62,8 +62,9 @@ class SettingManager:
         settings.right_threshold = float(self.qs.value("right_threshold", settings.right_threshold))
 
         # Mimetic
-        settings.alpha_map = {"x": self.qs.value("x", 0.2), "y": self.qs.value("y", 0.2), "z": self.qs.value("z", 0.2),
-                              "h": self.qs.value("h", 0.2), "e": self.qs.value("e", 0.2)}
+        settings.alpha_map = {"x": self.qs.value("x", settings.alpha_map.get("x")), "y": self.qs.value("y", settings.alpha_map.get("y")),
+                              "z": self.qs.value("z", settings.alpha_map.get("z")), "h": self.qs.value("h", settings.alpha_map.get("h")),
+                              "e": self.qs.value("e", settings.alpha_map.get("e"))}
 
         settings.send_rate = int(self.qs.value("send_rate", settings.send_rate))
         settings.send_threshold = float(self.qs.value("send_threshold", settings.send_threshold))
