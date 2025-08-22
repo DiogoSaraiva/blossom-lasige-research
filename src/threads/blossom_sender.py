@@ -95,7 +95,7 @@ class BlossomSenderThread(threading.Thread):
             else:
                 self.logger("[BlossomSender] Queue is full, dropping payload", level="warning")
         else:
-            pass #TODO
+            self.queue.put(payload)
 
     def stop(self):
         """

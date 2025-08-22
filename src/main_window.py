@@ -612,4 +612,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         if at_bottom:
             self.terminal_output.moveCursor(self.terminal_output.textCursor().MoveOperation.End)
-            self.terminal_output.ensureCursorVisible()
+            self.terminal_output.ens    def _get_sequence_duration(self, sequence: str) -> float:
+        """Return sequence duration in seconds (mock for now)."""
+        if sequence == "happy":
+            return 3.0
+        elif sequence == "sad":
+            return 5.0
+        else:
+            return 0.0ureCursorVisible()
