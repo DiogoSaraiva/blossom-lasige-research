@@ -17,34 +17,41 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         super().__init__(parent)
         self.setupUi(self)
 
+        # Base
         self.study_id.setText(compact_timestamp())
-
+        self.blossom_one_device.setCurrentText(current.blossom_one_device)
+        self.blossom_two_device.setCurrentText(current.blossom_two_device)
+        self._populate_serial_combos(
+            current_one=getattr(current, "blossom_one_device", ""),
+            current_two=getattr(current, "blossom_two_device", "")
+        )
         self.host.setText(current.host)
         self.blossom_one_port.setText(str(current.blossom_one_port))
         self.blossom_two_port.setText(str(current.blossom_two_port))
         self.mirror_video.setChecked(_as_bool(current.mirror_video))
         self.flip_blossom.setChecked(_as_bool(current.flip_blossom))
         self.output_directory.setText(current.output_directory)
-        self.music_directory.setText(current.music_directory)
+        self.browse_output_dir_button.clicked.connect(self._browse_output_dir)
 
+        # Gaze Tracking
         self.left_threshold.setText(str(current.left_threshold))
         self.right_threshold.setText(str(current.right_threshold))
 
-        self.browse_output_dir_button.clicked.connect(self._browse_output_dir)
-        self.browse_music_dir_button.clicked.connect(self._browse_music_dir)
-
+        # Mimetic
         self.alpha_map_x_value.setValue(current.alpha_map['x'])
         self.alpha_map_y_value.setValue(current.alpha_map['y'])
         self.alpha_map_z_value.setValue(current.alpha_map['z'])
         self.alpha_map_h_value.setValue(current.alpha_map['h'])
         self.alpha_map_e_value.setValue(current.alpha_map['e'])
-
         self.send_rate.setValue(current.send_rate)
+        self.send_threshold.setValue(current.send_threshold)
 
-        self._populate_serial_combos(
-            current_one=getattr(current, "blossom_one_device", ""),
-            current_two=getattr(current, "blossom_two_device", "")
-        )
+        # Dancer
+        self.dancer_mode.setCurrentText(current.dancer_mode)
+        self.music_directory.setText(current.music_directory)
+        self.mic_sr.setValue(current.mic_sr)
+        self.browse_music_dir_button.clicked.connect(self._browse_music_dir)
+
 
         self.buttonBox.accepted.connect(self._on_accept)
         self.buttonBox.rejected.connect(self.reject)
@@ -71,23 +78,28 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
     def _on_accept(self):
         try:
             new = Settings(
+                # Base
                 study_id=self.study_id.text(),
-                blossom_one_port=int(self.blossom_one_port.text()),
-                blossom_two_port=int(self.blossom_two_port.text()),
                 blossom_one_device=self.blossom_one_device.currentText(),
                 blossom_two_device=self.blossom_two_device.currentText(),
+                blossom_one_port=int(self.blossom_one_port.text()),
+                blossom_two_port=int(self.blossom_two_port.text()),
                 mirror_video=self.mirror_video.isChecked(),
                 flip_blossom=self.flip_blossom.isChecked(),
                 output_directory=self.output_directory.text().strip(),
+                # Gaze Tracking
                 left_threshold=float(self.left_threshold.text()),
                 right_threshold=float(self.right_threshold.text()),
+                # Mimetic
                 alpha_map={"x": float(self.alpha_map_x_value.text()), "y": float(self.alpha_map_y_value.text()),
                            "z": float(self.alpha_map_z_value.text()), "h": float(self.alpha_map_h_value.text()),
                            "e": float(self.alpha_map_e_value.text())},
                 send_rate=int(self.send_rate.text()),
                 send_threshold=float(self.send_threshold.text()),
                 target_fps=int(self.target_fps.text()),
+                # Dancer
                 music_directory=self.music_directory.text().strip(),
+                dancer_mode=self.dancer_mode.currentText(),
                 analysis_interval=float(self.analysis_interval.text()),
             )
 

@@ -30,8 +30,10 @@ class Settings:
     target_fps: int = 30
 
     # Dancer
-    music_directory: str = "./dancer/musics"
+    dancer_mode: str = "mic"
+    mic_sr: int = 22050
     analysis_interval: float = 5.0
+    music_directory: str = "./dancer/musics"
 
 
 
@@ -47,15 +49,14 @@ class SettingManager:
 
         # Base
         settings.study_id = self.qs.value("study_id")
+        settings.blossom_one_device = self.qs.value("blossom_one_device", settings.blossom_one_device)
+        settings.blossom_two_device = self.qs.value("blossom_two_device", settings.blossom_two_device)
         settings.host = self.qs.value("host", settings.host, str)
         settings.blossom_one_port = int(self.qs.value("blossom_one_port", settings.blossom_one_port))
         settings.blossom_two_port = int(self.qs.value("blossom_two_port", settings.blossom_two_port))
         settings.mirror_video = self.qs.value("mirror_video", settings.mirror_video)
         settings.flip_blossom = self.qs.value("flip_blossom", settings.flip_blossom)
         settings.output_directory = self.qs.value("output_directory", settings.output_directory)
-
-        settings.blossom_one_device = self.qs.value("blossom_one_device", settings.blossom_one_device)
-        settings.blossom_two_device = self.qs.value("blossom_two_device", settings.blossom_two_device)
 
         # Gaze Tracking
         settings.left_threshold = float(self.qs.value("left_threshold", settings.left_threshold))
@@ -72,6 +73,8 @@ class SettingManager:
 
         # Dancer
         settings.music_directory = self.qs.value("music_directory", settings.music_directory)
+        settings.mic_sr = int(self.qs.value("mic_sr", settings.mic_sr))
+        settings.dancer_mode = self.qs.value("dancer_mode", settings.dancer_mode)
         settings.analysis_interval = float(self.qs.value("analysis_interval", settings.analysis_interval))
 
         return settings
@@ -88,7 +91,6 @@ class SettingManager:
         self.qs.setValue("flip_blossom", settings.flip_blossom)
         self.qs.setValue("output_directory", settings.output_directory)
 
-
         # Gaze Tracking
         self.qs.setValue("left_threshold", settings.left_threshold)
         self.qs.setValue("right_threshold", settings.right_threshold)
@@ -100,8 +102,11 @@ class SettingManager:
         self.qs.setValue("target_fps", settings.target_fps)
 
         # Dancer
-        self.qs.setValue("music_directory", settings.music_directory)
+        self.qs.setValue("dancer_mode", settings.dancer_mode)
         self.qs.setValue("analysis_interval", settings.analysis_interval)
+        self.qs.setValue("mic_sr", settings.mic_sr)
+        self.qs.setValue("music_directory", settings.music_directory)
+
 
         self.qs.sync()
 

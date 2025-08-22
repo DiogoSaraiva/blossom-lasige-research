@@ -28,6 +28,7 @@ from src.utils import compact_timestamp, get_local_ip
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
         super().__init__()
+
         self.setupUi(self)
         self.blossom_one_type.currentTextChanged.connect(lambda: self.on_blossom_type_changed("one"))
         self.blossom_two_type.currentTextChanged.connect(lambda: self.on_blossom_type_changed("two"))
@@ -48,7 +49,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.settings = self.settings_mgr.load()
 
         self.output_directory = self.settings.output_directory
-        self.music_directory = self.settings.music_directory
 
         self.study_id = self.settings.study_id or compact_timestamp()
         self.logger = Logger(f"{self.output_directory}/{self.study_id}/system_log.json", mode="system")
@@ -104,7 +104,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.recorder_thread = None
 
         self._log_pos = 0
-        self.analysis_interval = self.settings.analysis_interval
 
         self.logger.set_system_log_level("debug")
 
@@ -123,10 +122,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             send_threshold=self.send_threshold,
         )
 
+        self.dancer_mode = self.settings.dancer_mode
+        self.analysis_interval = self.settings.analysis_interval
+        self.mic_sr = self.settings.mic_sr
+        self.music_directory = self.settings.music_directory
+
         self.dancer = Dancer(
             logger=self.logger,
-             music_dir=self.music_directory,
-             analysis_interval=self.analysis_interval,
+            mode="mic" if self.dancer_mode == "mic" else "audio",
+            analysis_interval=self.analysis_interval,
+            mic_sr=self.mic_sr,
+            music_dir=self.music_directory,
         )
         self.mimetic.update_sender("one", self.blossom_one_sender)
 

@@ -63,7 +63,7 @@
     <enum>QTabWidget::Rounded</enum>
    </property>
    <property name="currentIndex">
-    <number>2</number>
+    <number>0</number>
    </property>
    <property name="elideMode">
     <enum>Qt::ElideNone</enum>
@@ -1020,6 +1020,9 @@ QCheckBox::indicator:unchecked {
       <property name="maximum">
        <number>30</number>
       </property>
+      <property name="value">
+       <number>5</number>
+      </property>
      </widget>
     </widget>
     <widget class="QGroupBox" name="send_threshold_group">
@@ -1146,8 +1149,8 @@ QCheckBox::indicator:unchecked {
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>10</y>
-       <width>601</width>
+       <y>100</y>
+       <width>621</width>
        <height>80</height>
       </rect>
      </property>
@@ -1162,7 +1165,7 @@ QCheckBox::indicator:unchecked {
        <rect>
         <x>10</x>
         <y>40</y>
-        <width>480</width>
+        <width>501</width>
         <height>27</height>
        </rect>
       </property>
@@ -1173,7 +1176,7 @@ QCheckBox::indicator:unchecked {
      <widget class="QPushButton" name="browse_music_dir_button">
       <property name="geometry">
        <rect>
-        <x>500</x>
+        <x>520</x>
         <y>40</y>
         <width>88</width>
         <height>27</height>
@@ -1190,8 +1193,8 @@ QCheckBox::indicator:unchecked {
     <widget class="QGroupBox" name="analysis_interval_group">
      <property name="geometry">
       <rect>
-       <x>10</x>
-       <y>100</y>
+       <x>330</x>
+       <y>10</y>
        <width>120</width>
        <height>80</height>
       </rect>
@@ -1244,6 +1247,90 @@ QCheckBox::indicator:unchecked {
       </property>
       <property name="text">
        <string>sec</string>
+      </property>
+     </widget>
+    </widget>
+    <widget class="QGroupBox" name="dancer_mode_group">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>10</y>
+       <width>315</width>
+       <height>80</height>
+      </rect>
+     </property>
+     <property name="title">
+      <string>Dancer Mode</string>
+     </property>
+     <widget class="QComboBox" name="dancer_mode">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>40</y>
+        <width>70</width>
+        <height>27</height>
+       </rect>
+      </property>
+      <item>
+       <property name="text">
+        <string>mic</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>audio</string>
+       </property>
+      </item>
+     </widget>
+     <widget class="QLabel" name="dancer_mode_explication">
+      <property name="geometry">
+       <rect>
+        <x>90</x>
+        <y>40</y>
+        <width>220</width>
+        <height>19</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Hearing audio from microphone</string>
+      </property>
+     </widget>
+    </widget>
+    <widget class="QGroupBox" name="mic_sr_group">
+     <property name="geometry">
+      <rect>
+       <x>460</x>
+       <y>10</y>
+       <width>171</width>
+       <height>80</height>
+      </rect>
+     </property>
+     <property name="title">
+      <string>Mic Sample Rate</string>
+     </property>
+     <widget class="QSpinBox" name="mic_sr">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>40</y>
+        <width>151</width>
+        <height>28</height>
+       </rect>
+      </property>
+      <property name="suffix">
+       <string> hz</string>
+      </property>
+      <property name="minimum">
+       <number>1</number>
+      </property>
+      <property name="maximum">
+       <number>100000</number>
+      </property>
+      <property name="stepType">
+       <enum>QAbstractSpinBox::DefaultStepType</enum>
+      </property>
+      <property name="value">
+       <number>22050</number>
       </property>
      </widget>
     </widget>
