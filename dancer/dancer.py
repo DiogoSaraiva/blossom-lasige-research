@@ -97,10 +97,23 @@ class Dancer:
         return self.beat_detector.analyse_microphone()
 
     def run_for_audio(self) -> str:
-        pass
+        """
+        Run analysis for all songs in music_dir and return the last detected sequence.
+        """
+        music_dir_path = Path(self.music_dir)
 
+        if not music_dir_path.exists() or not music_dir_path.is_dir():
+            self.logger(f"[Dancer] Music directory not found: {self.music_dir}", level="error")
+            return ""
 
+        last_sequence = ""
+        for music_path in music_dir_path.glob("*.mp3"):
+            self.logger(f"[Dancer] Analyzing music file: {music_path.name}", level="info")
+            sequences = self.beat_detector.analyse_music(str(music_path))
+            if sequences:
+                last_sequence = list(sequences.values())[-1]
 
+        return last_sequence
 
     def update_sender(self, number: Literal["one", "two"], blossom_sender: BlossomSenderThread | None):
         setattr(self, f"blossom_{number}_sender", blossom_sender)
