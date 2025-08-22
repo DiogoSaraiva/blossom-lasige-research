@@ -8,23 +8,25 @@ import numpy as np
 from dancer.src.music_player import MusicPlayer
 from src.logging_utils import Logger
 from src.settings import Settings
+import sounddevice as sd
 
-from mimetic.src.threads.blossom_sender import BlossomSenderThread
+
+from src.threads.blossom_sender import BlossomSenderThread
 
 
 
 class BeatDetector:
 
-    def __init__(self, logger: Logger, settings: Settings):
+    def __init__(self, logger: Logger):
         self.logger = logger
-        self.settings = settings
-        self.current_music_path: str
-        self.current_music_duration: float
+        self.current_music_path: str = ""
+        self.current_music_duration: float = 0.0
         self.MusicPlayer = MusicPlayer(logger)
         self.is_running = False
         self.analysis_interval = 5
         self.current_sequence = None
-        self.blossom_sender_thread = BlossomSenderThread(host=self.host, port=self.port, logger=self.logger)
+        self.blossom_one_sender = self.blossom_two_sender = None
+        self.is_sending_one = self.is_sending_two = False
 
 
 
@@ -32,10 +34,9 @@ class BeatDetector:
         self.current_music_path = music_path
         self.current_music_duration = librosa.get_duration(filename=music_path)
         self.logger(f"[Dancer] Now playing: {Path(music_path).name} ({self.current_music_duration:.1f}s)", level="info")
-        MusicPlayer.play(music_path)
         self.analyse_music(music_path)
 
-    def analyse_music(self, music_path: str) -> dict:
+    def analyse_music(self, music_path: str, blossom_sender: BlossomSenderThread) -> dict:
         current_time = 0.0
 
 
@@ -49,7 +50,7 @@ class BeatDetector:
                     duration = self.get_sequence_duration(sequence)
                     if duration is not None:
                         payload = {"sequence": sequence, "duration": duration}
-                        self.blossom_sender_thread.send(payload)
+                        blossom_sender.send(payload)
                         self.current_sequence = sequence
                         self.logger(f"[Dancer] Mood -> '{sequence}', ({duration:.2f})s", level="debug")
                     else:
@@ -78,3 +79,47 @@ class BeatDetector:
         except Exception as e:
             self.logger(f"[ERROR] Failed to get sequence duration: {e}", level="critical")
         return 2.0
+
+
+    def analyse_microphone(self, sr: int = 22050):
+        """
+        Continuously capture audio from the microphone and detect mood changes.
+        Runs until self.is_running = False
+        """
+        self.logger(f"[DancerMic] Starting microphone analysis loop...", level="info")
+        self.is_running = True
+        self.current_sequence = None
+
+        while self.is_running:
+            # Record audio for analysis_interval seconds
+            recording = sd.rec(int(self.analysis_interval * sr), samplerate=sr, channels=1, dtype="float32")
+            sd.wait()
+
+            # Process audio
+            y = recording.flatten()
+            tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+            energy = np.mean(np.abs(y))
+
+            # Detect mood
+            if tempo > 100 and energy > 0.1:
+                sequence = "happy"
+            else:
+                sequence = "sad"
+
+            # Only update if mood changes
+            if sequence != self.current_sequence:
+                self.current_sequence = sequence
+                self.logger(f"[Dancer] Mood changed -> '{sequence}'", level="info")
+
+                # Send to Blossom
+                if self.is_sending_one:
+                    self.blossom_one_sender.send(sequence)
+                if self.is_sending_two:
+                    self.blossom_two_sender.send(sequence)
+
+
+
+            else:
+                self.logger(f"[Dancer] Mood unchanged: '{sequence}'", level="debug")
+
+        self.logger("[Dancer] Dancer stopped.", level="info")
