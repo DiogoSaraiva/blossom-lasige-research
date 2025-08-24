@@ -186,7 +186,7 @@ class MediaPipeThread(threading.Thread):
             timestamp_ms (int): The timestamp of the frame in milliseconds.
         """
         if not result.face_landmarks or not result.face_landmarks[0]:
-            self.logger("[MediaPipe] No face landmarks detected", level="debug")
+            # self.logger("[MediaPipe] No face landmarks detected", level="debug")
             return
         try:
             self.latest_face = result

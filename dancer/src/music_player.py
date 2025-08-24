@@ -13,7 +13,7 @@ class MusicPlayer:
     def __init__(self, logger: Logger, target_sr: int = 22050):
         self.logger = logger
         self.current_music_path: Optional[str] = None
-        self.is_playing: bool = False
+        self.is_running: bool = False
         self._target_sr = int(target_sr)
 
         self._thread: Optional[threading.Thread] = None
@@ -25,20 +25,21 @@ class MusicPlayer:
         self.current_music_path = music_path
         self._stop_event.clear()
         self._thread = threading.Thread(target=self._worker, daemon=False)
+        self.logger("[MusicPlayer] Starting thread", level="debug")
         self._thread.start()
 
     def stop(self):
         self._stop_event.set()
         try:
             sd.stop()
-        except Exception:
-            pass
+        except Exception as e:
+            self.logger(f"[MusicPlayer] Exception raised: {e}", level="error")
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=2.0)
         self._thread = None
-        if self.is_playing:
+        if self.is_running:
             self.logger("[MusicPlayer] Stopped.", level="info")
-        self.is_playing = False
+        self.is_running = False
 
     def _worker(self):
         path = self.current_music_path
@@ -52,12 +53,14 @@ class MusicPlayer:
 
             sd.default.channels = 1
             self.logger(f"[MusicPlayer] Playing: {Path(path).name}", level="info")
-            self.is_playing = True
+            self.is_running = True
 
             sd.play(y.astype(np.float32, copy=False), sr)
-            sd.wait()
+            while not self._stop_event.is_set() and sd.get_stream().active:
+                sd.wait()
+            sd.stop()
 
         except Exception as e:
             self.logger(f"[MusicPlayer] Playback error on '{Path(path).name}': {e}", level="error")
         finally:
-            self.is_playing = False
+            self.is_running = False

@@ -8,6 +8,7 @@ import sounddevice as sd
 from src.logging_utils import Logger
 from joblib.externals import loky  # noqa
 from librosa import beat, onset  # noqa
+from dancer.src.dance_sequences import dance_sequence_from_data
 
 class BeatDetector:
 
@@ -42,7 +43,7 @@ class BeatDetector:
         tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
         energy = float(np.sum(np.abs(y)) / y.size)
         self.logger(f"[BeatDetector] Segment @ {offset:.1f}s - BPM: {float(tempo):.2f}, Energy: {energy:.4f}", level="debug")
-        return "happy" if float(tempo) > 100 and energy > 0.1 else "sad"
+        return dance_sequence_from_data(tempo=float(tempo), energy=energy)
 
     def analyse_microphone(self) -> Dict[str, str | float]:
         """
@@ -58,10 +59,7 @@ class BeatDetector:
         energy = float(np.mean(np.abs(y)))
 
         # Detect mood
-        if float(tempo) > 100 and energy > 0.1:
-            sequence = "happy"
-        else:
-            sequence = "sad"
+        sequence = dance_sequence_from_data(tempo=float(tempo), energy=energy)
 
         self.logger(f"[BeatDetector] Tempo: {float(tempo):.2f} - Energy: {energy:.4f}", level="debug")
 

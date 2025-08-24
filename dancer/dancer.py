@@ -76,7 +76,7 @@ class Dancer:
     def _main_loop(self):
         self.logger("[Dancer] Launching Dancer...", level="info")
         self.is_running = True
-        while not self._stop_event.is_set():
+        while not self._stop_event.is_set() and self.is_running:
             if self._music_over and self.mode == "audio":
                 next_music = self._get_next_music_path()
                 if next_music:
@@ -84,17 +84,17 @@ class Dancer:
                     self.logger(f"[Dancer] Now playing: {os.path.basename(next_music)}", level="info")
                 else:
                     self.logger("[Dancer] No tracks available. Waiting...", level="warning")
-                    time.sleep(0.5)
+                    self._cooperative_sleep(0.5)
                     continue
 
             mood = self._run()
             if not mood:
-                time.sleep(self.resting_period)
+                self._cooperative_sleep(self.resting_period)
                 continue
 
             sequence = mood.get("sequence")
             if not sequence:
-                time.sleep(self.resting_period)
+                self._cooperative_sleep(self.resting_period)
                 continue
             if sequence != self.current_sequence:
                 duration_ms = self.get_sequence_duration_ms(sequence)
@@ -112,15 +112,15 @@ class Dancer:
             seg = float(mood.get("mood_duration", self.analysis_interval))
             end_ttime = time.time() + max(0.0, seg - self.resting_period)
             while time.time() < end_ttime and not self._stop_event.is_set():
-                time.sleep(min(self.resting_period, end_ttime - time.time()))
+                self._cooperative_sleep(min(self.resting_period, end_ttime - time.time()))
             else:
-                self.logger(f"[Dancer] Mood unchanged: '{sequence}'", level="debug")
-                time.sleep(self.resting_period)
+                self._cooperative_sleep(self.resting_period)
 
         self.is_running = False
         self.logger("[Dancer] Loop ended.", level="debug")
 
     def start(self):
+        self.is_running = True
         self._run = self.run_for_mic if self.mode == "mic" else self.run_for_audio
         if self._thread is None or not self._thread.is_alive():
             self._stop_event.clear()
@@ -132,6 +132,7 @@ class Dancer:
 
     def stop(self):
         self.logger("[Dancer] Stopping...", level="info")
+        self.music_player.stop()
         self.current_sequence = None
         self._stop_event.set()
         if self._thread is not None and self._thread.is_alive():
@@ -170,6 +171,8 @@ class Dancer:
         setattr(self, f"blossom_{number}_sender", blossom_sender)
 
     def start_sending(self, blossom_sender: BlossomSenderThread, number: Literal["one", "two"]):
+        if not (self.is_sending_one or self.is_sending_two):
+            self.start()
         if getattr(self, f"is_sending_{number}"):
             self.logger(f"[Dancer] Sending already enabled for Blossom {number.capitalize()}.", level="warning")
             return
@@ -177,13 +180,16 @@ class Dancer:
         setattr(self, f"is_sending_{number}", True)
         blossom_sender.start()
 
+
     def stop_sending(self, blossom_sender: BlossomSenderThread, number: Literal["one", "two"]):
         if not getattr(self, f"is_sending_{number}"):
             self.logger(f"[Dancer] Sending not enabled for Blossom {number.capitalize()}.", level="warning")
             return
         setattr(self, f"is_sending_{number}", False)
         blossom_sender.stop()
-        blossom_sender.join(timeout=2.0)
+        blossom_sender.join()
+        if not (self.is_sending_one or self.is_sending_two):
+            self.stop()
 
     def change_music(self, music_path: str):
         self.beat_detector.change_music(music_path)
@@ -191,3 +197,8 @@ class Dancer:
         self._music_schedule = []
         self._current_schedule_index = 0
         self._music_over = False
+
+    def _cooperative_sleep(self, seconds: float, step: float = 0.02):
+        end = time.time() + max(0.0, seconds)
+        while (self.is_running and not self._stop_event.is_set()) and time.time() < end:
+            time.sleep(min(step, end - time.time()))
