@@ -11,6 +11,7 @@ from src.logging_utils import Logger
 class BlossomSenderThread(threading.Thread):
     def __init__(self, logger: Logger, mode: Literal["mimetic", "dancer"], host="localhost", port: int = 8000, max_queue: int = 32, min_interval: float = 0.1):
         super().__init__(daemon=True)
+        self.last_payload = None
         self.logger = logger
         self.queue = Queue(maxsize=max_queue or (32 if mode == "mimetic" else 4))
         self.is_running = True
@@ -20,18 +21,23 @@ class BlossomSenderThread(threading.Thread):
         self.mode = mode
         self.is_running = True
         self.last_send_time = 0.0
-        self.last_sequence = None
 
     def run(self):
         self.logger(f"[BlossomSender] Thread started (mode: {self.mode})", level="info")
         try:
             while self.is_running:
                 try:
-                    payload = self.queue.get(timeout=0.1)
+                    self.last_payload = payload = self.queue.get(timeout=0.1)
                 except Empty:
-                    continue
-                if payload is None:
-                    break
+                    if self.mode == "mimetic":
+                        self._cooperative_sleep(0.01)
+                        continue
+                if self.last_payload is None:
+                    if self.mode == "mimetic":
+                        self.logger("[BlossomSender] Payload is empty", level="warning")
+                        break
+                    else:
+                        continue
 
                 # rate limit
                 now = time.time()
@@ -49,34 +55,34 @@ class BlossomSenderThread(threading.Thread):
                         h = payload.get("h", 0)
                         duration = payload.get("duration_ms", 0) / 1000
                         self.logger(
-                            f"Sent -> Pitch: {x:.3f}, Roll: {y:.3f}, Yaw: {z:.3f}, Height: {h:.3f}, Duration: {duration:.2f}s", level="debug")
+                            f"[BlossomSender] Sent -> Pitch: {x:.3f}, Roll: {y:.3f}, Yaw: {z:.3f}, Height: {h:.3f}, Duration: {duration:.2f}s", level="debug")
                     else:
-                        sequence = payload.get("sequence")
-                        duration_ms = payload.get("duration_ms", 0)
+                        sequence = self.last_payload.get("sequence")
+                        duration_ms = self.last_payload.get("duration_ms")
                         if not sequence or duration_ms <= 0:
                             self.logger("[BlossomSender] Invalid sequence payload", level="warning")
                             continue
+                        requests.get(f"http://{self.host}:{self.port}/s/{sequence}", timeout=2)
+                        self.logger(f"[BlossomSender] Sent sequence: '{sequence}'", level="debug")
+                        self.last_send_time = time.time()
+                        self._cooperative_sleep(duration_ms / 1000.0)
 
-                        if sequence != self.last_sequence:
-                            requests.post(f"http://{self.host}:{self.port}/sequence", data=sequence, timeout=2)
-                            self.last_sequence = sequence
-                            self.last_send_time = time.time()
-                            self._cooperative_sleep(duration_ms / 1000.0)
-                            self.last_sequence = None
-                        else:
-                            pass
 
-                except requests.RequestException as e:
+                except Exception as e:
                     self.logger(f"[BlossomSender] Error sending: {e}", level="error")
 
         except Exception as e:
             import traceback
             self.logger(f"[BlossomSender] CRASHED: {e} \n {traceback.format_exc()}", level="critical")
+        finally:
+            self.logger(f"[BlossomSender] Closing thread", level="info")
+            self.stop()
 
     def _cooperative_sleep(self, seconds: float, step: float = 0.02):
         end = time.time() + max(0.0, seconds)
         while self.is_running and time.time() < end:
             time.sleep(min(step, end - time.time()))
+        self.logger(f"[BlossomSender] slept for {seconds} seconds", level="debug")
 
     def send(self, payload: dict):
         if self.mode == "mimetic":
@@ -86,6 +92,7 @@ class BlossomSenderThread(threading.Thread):
                 self.logger("[BlossomSender] Queue full, dropping pose", level="warning")
         else:
             if not self.queue.full():
+                self.logger(f"[BlossomSender] received payload containing sequence: {payload['sequence']}", level="debug")
                 self.queue.put_nowait(payload)
             else:
                 self.logger("[BlossomSender] Queue full, dropping pose", level="warning")

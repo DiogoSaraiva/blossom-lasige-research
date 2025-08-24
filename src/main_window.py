@@ -29,6 +29,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
         super().__init__()
 
+        self._last_log_msg = None
         self.setupUi(self)
         self.blossom_one_type.currentTextChanged.connect(lambda: self.on_blossom_type_changed("one"))
         self.blossom_two_type.currentTextChanged.connect(lambda: self.on_blossom_type_changed("two"))
@@ -276,7 +277,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.toggle_blossom(action="reset", number="one")
         if self.blossom_two_sender:
             self.toggle_blossom(action="reset", number="two")
-
         if self.capture_thread:
             self.capture_thread.stop()
             self.capture_thread.join()
@@ -285,6 +285,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if self.mimetic_thread:
             self.mimetic_thread.stop()
             self.mimetic_thread.wait()
+        if self.dancer and self.dancer.is_running:
+            self.dancer.stop()
 
         if self.recorder_thread and self.recorder_thread.is_running:
             self.recorder_thread.stop()
@@ -427,7 +429,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         setattr(self, attr, launcher)
 
-
         def on_ready():
             blossom_attr = getattr(self, mode, None)
             if launcher.success:
@@ -450,6 +451,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         launcher.finished.connect(on_ready)
         launcher.start()
+
 
     def send_blossom_command(self, number: Literal["one", "two"], command: str):
         proc = getattr(self, f"blossom_{number}_server_process")
@@ -493,7 +495,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     launcher.init_allowed = False
                     self.logger(f"Canceled Blossom {number.capitalize()} server initialization....", level="info")
                 if getattr(launcher, "success") and controller:
-                    sender =  getattr(self, f"blossom_{number}_sender")
+                    sender =  getattr(self, sender_attr)
                     if getattr(controller, f"is_sending_{number}"):
                         controller.stop_sending(blossom_sender=sender, number=number)
                         self.logger(f"{type_name.capitalize()} sending stopped.", level="info")
@@ -503,6 +505,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     sender.join()
 
             self.logger(f"Blossom {number.capitalize()} server stopped...", level="info")
+            setattr(self, sender_attr, None)
             combo.setEnabled(True)
 
             if hasattr(self, server_proc_attr):
@@ -522,7 +525,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     level="info"
                 )
                 self.send_blossom_command(number, "reset")
-                QTimer.singleShot(100, stop)
+                QTimer.singleShot(50, stop)
             else:
                 self.logger(f"Blossom {number.capitalize()} server is not active.", level="warning")
 
@@ -614,7 +617,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             }.get(level, "#ffffff")
 
             html_line = f'<span style="color:{color};">[{timestamp}] [{level}]</span> {msg}'
-            self.terminal_output.append(html_line)
+            if msg != self._last_log_msg:
+                self.terminal_output.append(html_line)
+                self._last_log_msg = msg
 
         if at_bottom:
             self.terminal_output.moveCursor(self.terminal_output.textCursor().MoveOperation.End)
