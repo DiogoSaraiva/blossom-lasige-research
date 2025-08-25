@@ -32,6 +32,8 @@ sympy==1.14.0
 mpmath==1.3.0
 matplotlib~=3.10.3
 pandas
+seaborn
+fpdf
 
 ############################
 # Utilities
@@ -50,6 +52,7 @@ configargparse
 
 
 PyQt6~=6.9.1
+
 ############################
 # Audio
 ############################
