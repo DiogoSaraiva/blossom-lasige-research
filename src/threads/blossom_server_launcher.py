@@ -19,7 +19,7 @@ class BlossomServerLauncher(QThread):
         self.init_allowed = True
         self.url = f"http://{self.host}:{self.port}/"
 
-    def wait_for_server_ready(self, timeout=10.0, interval=0.5):
+    def wait_for_server_ready(self, timeout=10.0, interval=0.5) -> bool:
         self.logger(f"[BlossomLauncher] Waiting for Blossom server at {self.url}...", level="info")
         start_time = time.time()
         while time.time() - start_time < timeout:
@@ -37,16 +37,17 @@ class BlossomServerLauncher(QThread):
         self.logger(f"[BlossomLauncher] Timeout: Blossom server at {self.url} not responding.", level="error")
         return False
 
-    def kill_if_using_port(self):
+    def kill_if_using(self, mode:Literal["port", "device"]):
         """
         Kills all processes listening on a given TCP port.
         Logs each kill.
         """
         try:
-            result = subprocess.run(
-                ["lsof", "-t", f"-i:{self.port}"],
-                capture_output=True, text=True, check=False
-            )
+            if mode == "port":
+                result = subprocess.run(["lsof", "-t", f"-i:{self.port}"], capture_output=True, text=True, check=False)
+            else:
+                result = subprocess.run(["lsof", "-t", f"-i:{self.usb}"], capture_output=True, text=True, check=False
+                                        )
             pids = [p.strip() for p in result.stdout.splitlines() if p.strip()]
 
             if not pids:
@@ -54,7 +55,7 @@ class BlossomServerLauncher(QThread):
 
             for pid in pids:
                 try:
-                    self.logger(f"[BlossomLauncher] Port {self.port} in use by PID {pid}. Killing...", level="warning")
+                    self.logger(f"[BlossomLauncher] {mode.capitalize()} {self.port if mode == 'port' else self.usb} in use by PID {pid}. Killing...", level="warning")
                     os.kill(int(pid), 9)  # SIGKILL
                 except Exception as e:
                     self.logger(f"[BlossomLauncher] Failed to kill PID {pid}: {e}", level="error")
@@ -62,12 +63,13 @@ class BlossomServerLauncher(QThread):
         except FileNotFoundError:
             self.logger("[BlossomLauncher] lsof not installed. Cannot check ports.", level="error")
         except Exception as e:
-            self.logger(f"[BlossomLauncher] Error while checking/killing port {self.port}: {e}", level="error")
+            self.logger(f"[BlossomLauncher] Error while checking/killing {mode} {self.port if mode == 'port' else self.usb}: {e}", level="error")
 
     def run(self):
         try:
             self.logger(f"[BlossomLauncher]  Launching blossom_public/start.py ({self.number.upper()} at {self.url})...", level="info")
-            self.kill_if_using_port()
+            self.kill_if_using(mode="port")
+            self.kill_if_using(mode="device")
             self.server_proc = subprocess.Popen([
                 "python", "blossom_public/start.py",
                 "--host", self.host,
