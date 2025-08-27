@@ -81,8 +81,8 @@ class BlossomSenderThread(threading.Thread):
     def _cooperative_sleep(self, seconds: float, step: float = 0.02):
         end = time.time() + max(0.0, seconds)
         while self.is_running and time.time() < end:
-            time.sleep(min(step, end - time.time()))
-        self.logger(f"[BlossomSender] slept for {seconds} seconds", level="debug")
+            time.sleep(max(step, end - time.time()))
+        # self.logger(f"[BlossomSender] slept for {seconds} seconds", level="debug")
 
     def send(self, payload: dict):
         if self.mode == "mimetic":

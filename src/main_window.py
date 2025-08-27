@@ -24,6 +24,7 @@ from src.threads.mimetic_thread import MimeticRunnerThread
 from src.threads.recorder_thread import RecorderThread
 from src.utils import compact_timestamp, get_local_ip
 
+LOG_LEVEL = "debug"
 
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
@@ -106,7 +107,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self._log_pos = 0
 
-        self.logger.set_system_log_level("debug")
+        self.logger.set_system_log_level(LOG_LEVEL)
 
         self.mimetic = Mimetic(
             study_id=self.study_id,
@@ -142,7 +143,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         sender = getattr(self, f"blossom_{number}_sender", None)
         if sender:
             sender.mode = new_type
-        self.logger(f"Blossom {number} type set to '{new_type}'.", level="debug")
+        self.logger(f"[Main] Blossom {number} type set to '{new_type}'.", level="debug")
         sender = getattr(self, f"blossom_{number}_sender", None)
         if new_type == "mimetic":
             self.mimetic.update_sender(number, sender)
@@ -193,21 +194,21 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if changed_thresholds:
             try:
                 self.mimetic.update_threshold(new.left_threshold, new.right_threshold)
-                self.logger(f"Updated for new thresholds: {new.left_threshold}, {new.right_threshold}", level="info")
+                self.logger(f"[Main] Updated for new thresholds: {new.left_threshold}, {new.right_threshold}", level="info")
             except Exception as e:
-                self.logger(f"Failed to apply thresholds: {e}", level="error")
+                self.logger(f"[Main] Failed to apply thresholds: {e}", level="error")
 
         if changed_alpha_map:
             self.mimetic.limiter.alpha_map = new.alpha_map
-            self.logger(f"Updated for new alpha_map: {new.alpha_map}", level="info")
+            self.logger(f"[Main] Updated for new alpha_map: {new.alpha_map}", level="info")
 
         if changed_send_rate:
             self.mimetic.limiter.send_rate = new.send_rate
-            self.logger(f"Updated for new send_rate: {new.send_rate}", level="info")
+            self.logger(f"[Main] Updated for new send_rate: {new.send_rate}", level="info")
 
         if changed_send_threshold:
             self.mimetic.limiter.send_threshold = new.send_threshold
-            self.logger(f"Updated for new send_threshold: {new.send_threshold}", level="info")
+            self.logger(f"[Main] Updated for new send_threshold: {new.send_threshold}", level="info")
 
         changed_host = (old.host != new.host)
         changed_blossom_one_port = (old.blossom_one_port != new.blossom_one_port)
@@ -217,11 +218,21 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         changed_blossom_one_endpoint = changed_host or changed_blossom_one_port
         changed_blossom_two_endpoint = changed_host or changed_blossom_two_port
 
+        changed_study_id = (old.study_id != new.study_id)
+
+        if changed_study_id:
+            self.study_id = new.study_id
+            self.terminal_output.clear()
+            self._log_pos = 0
+            self._last_log_msg = None
+            self.logger = Logger(output_path=f"{self.output_directory}/{self.study_id}/system_log.json", mode="system", level=LOG_LEVEL)
+            self.capture_thread.logger = self.logger
+
         if changed_host:
             self.host = new.host
             self.blossom_one_sender.host = new.host
             self.blossom_two_sender.host = new.host
-            self.logger(f"Updated for new host: {new.host}", level="info")
+            self.logger(f"[Main] Updated for new host: {new.host}", level="info")
 
         one_type = self.get_blossom_type("one")
         two_type = self.get_blossom_type("two")
@@ -233,24 +244,24 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             if blossom_one_attr and hasattr(blossom_one_attr, "port"):
                 blossom_one_attr.port = new.blossom_one_port
             self.blossom_one_sender.port = new.blossom_one_port
-            self.logger(f"Changed to new {one_type} endpoint: {new.host}:{new.blossom_one_port}", level="info")
+            self.logger(f"[Main] Changed to new {one_type} endpoint: {new.host}:{new.blossom_one_port}", level="info")
 
         if changed_blossom_two_endpoint:
             self.blossom_two_port = new.blossom_two_port
             if blossom_two_attr and hasattr(blossom_two_attr, "port"):
                 blossom_two_attr.port = new.blossom_two_port
             self.blossom_two_sender.port = new.blossom_two_port
-            self.logger(f"Changed to new {two_type} endpoint: {new.host}:{new.blossom_two_port}", level="info")
+            self.logger(f"[Main] Changed to new {two_type} endpoint: {new.host}:{new.blossom_two_port}", level="info")
 
         if changed_output_directory:
             subprocess.run(["mkdir", "-p", new.output_directory])
-            self.logger(f"created output directory at {new.output_directory}", level="debug")
+            self.logger(f"[Main] created output directory at {new.output_directory}", level="debug")
             subprocess.run(["mv", f"{self.output_directory}/{self.study_id}", new.output_directory])
-            self.logger(f"Moved.. 'mv {self.output_directory}/{self.study_id} {new.output_directory}'", level="debug")
+            self.logger(f"[Main] Moved.. 'mv {self.output_directory}/{self.study_id} {new.output_directory}'", level="debug")
             self.output_directory = new.output_directory
             self.mimetic.update_output_directory(new.output_directory)
-            self.logger("Updated pose logging directory...", level="debug")
-            self.logger(f"Output directory successfully changed to {self.output_directory}/{self.study_id}", level="info")
+            self.logger("[Main] Updated pose logging directory...", level="debug")
+            self.logger(f"[Main] Output directory successfully changed to {self.output_directory}/{self.study_id}", level="info")
             self.logger.output_path = f"{self.output_directory}/{self.study_id}/system_log.json"
 
         self.logger("Settings applied.", level="info")
@@ -307,7 +318,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.calibrate_pose_button.setText("Calibrate")
 
     def calibration_failed(self, error_msg: str):
-        self.logger(f"Calibration failed: {error_msg}", level="error")
+        self.logger(f"[Main] Calibration failed: {error_msg}", level="error")
         self.calibrate_pose_button.setEnabled(True)
         self.calibrate_pose_button.setText("Calibrate")
 
@@ -318,16 +329,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             if self.mimetic.is_running:
                 self.logger("Pose recognition already running", level="warning")
                 return
-            self.logger("Starting Pose Recognition...", level="info")
+            self.logger("[Main] Starting Pose Recognition...", level="info")
             self.mimetic.start()
             self.mimetic_thread.start()
             self.pose_button.setText("Stop Pose Recognition")
 
         def stop_pose_recognition():
             if not self.mimetic.is_running:
-                self.logger("Pose recognition already stopped", level="warning")
+                self.logger("[Main] Pose recognition already stopped", level="warning")
                 return
-            self.logger("Stopping Pose Recognition...", level="info")
+            self.logger("[Main] Stopping Pose Recognition...", level="info")
             if self.mimetic.is_sending_one or self.mimetic.is_sending_two:
                 if self.get_blossom_type("one") == "mimetic":
                     self.mimetic.stop_sending(blossom_sender=self.blossom_one_sender, number="one")
@@ -419,7 +430,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         proc_attr = f"blossom_{number}_server_process"
 
         if getattr(self, attr) is not None and getattr(self, attr).isRunning():
-            self.logger(f"{mode.capitalize()} Blossom {number.capitalize()} server is already starting or running.", level="warning")
+            self.logger(f"[Main] {mode.capitalize()} Blossom {number.capitalize()} server is already starting or running.", level="warning")
             return
         port = getattr(self.settings, f"blossom_{number}_port")
         device = getattr(self.settings, f"blossom_{number}_device")
@@ -432,9 +443,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         def on_ready():
             blossom_attr = getattr(self, mode, None)
             if launcher.success:
-                self.logger(f"{mode.capitalize()} Blossom server started successfully.")
+                self.logger(f"[Main] {mode.capitalize()} Blossom server started successfully.")
                 setattr(self, proc_attr, launcher.server_proc)
-                self.logger(f"{str(mode).upper()} Blossom {number.capitalize()} server is ready. Starting sender thread.", level="info")
+                self.logger(f"[Main] {str(mode).upper()} Blossom {number.capitalize()} server is ready. Starting sender thread.", level="info")
                 if blossom_attr: # and hasattr(blossom_attr, "start_sending"):
                     setattr(self, f"blossom_{number}_sender", BlossomSenderThread(host=self.host, port=port, logger=self.logger,
                                         mode=self.get_blossom_type(number)))
@@ -442,12 +453,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     blossom_attr.update_sender(blossom_sender=sender, number=number)
                     blossom_attr.start_sending(blossom_sender=sender, number=number)
                 else:
-                    self.logger(f"{mode.capitalize()} controller not available to start sending.",
+                    self.logger(f"[Main] {mode.capitalize()} controller not available to start sending.",
                                 level="warning")
 
             else:
                 if hasattr(self, attr) and getattr(self, attr).init_allowed:
-                    self.logger(f"Failed to start {mode.capitalize()} Blossom server.", level="error")
+                    self.logger(f"[Main] Failed to start {mode.capitalize()} Blossom server.", level="error")
 
         launcher.finished.connect(on_ready)
         launcher.start()
@@ -457,16 +468,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         proc = getattr(self, f"blossom_{number}_server_process")
 
         if proc is None or proc.stdin is None or proc.poll() is not None:
-            self.logger(f"Cannot send command: Blossom {number.capitalize()} server not running or stdin closed.",
+            self.logger(f"[Main] Cannot send command: Blossom {number.capitalize()} server not running or stdin closed.",
                         level="error")
             return
 
         try:
             proc.stdin.write((command + "\n").encode())
             proc.stdin.flush()
-            self.logger(f"Sent '{command}' to {number.capitalize()} Blossom server.")
+            self.logger(f"[Main] Sent '{command}' to {number.capitalize()} Blossom server.")
         except Exception as e:
-            self.logger(f"Failed to send '{command}' to {number.capitalize()}: {e}", level="error")
+            self.logger(f"[Main] Failed to send '{command}' to {number.capitalize()}: {e}", level="error")
 
     def toggle_blossom(self, number: Literal["one", "two"], action: Literal["start", "stop", "reset"] = None):
         # Attribute names
@@ -493,18 +504,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 launcher = getattr(self, launcher_attr)
                 if launcher and launcher.isRunning():
                     launcher.init_allowed = False
-                    self.logger(f"Canceled Blossom {number.capitalize()} server initialization....", level="info")
+                    self.logger(f"[Main] Canceled Blossom {number.capitalize()} server initialization....", level="info")
                 if getattr(launcher, "success") and controller:
                     sender =  getattr(self, sender_attr)
                     if getattr(controller, f"is_sending_{number}"):
                         controller.stop_sending(blossom_sender=sender, number=number)
-                        self.logger(f"{type_name.capitalize()} sending stopped.", level="info")
+                        self.logger(f"[Main] {type_name.capitalize()} sending stopped.", level="info")
                     self.send_blossom_command(number, "q")
 
                     sender.stop()
                     sender.join()
 
-            self.logger(f"Blossom {number.capitalize()} server stopped...", level="info")
+            self.logger(f"[Main] Blossom {number.capitalize()} server stopped...", level="info")
             setattr(self, sender_attr, None)
             combo.setEnabled(True)
 
@@ -518,16 +529,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         def reset():
             if getattr(self, active_attr, False) and controller:
-                self.logger(f"Resetting Blossom {number.capitalize()}...", level="warning")
+                self.logger(f"[Main] Resetting Blossom {number.capitalize()}...", level="warning")
                 # if getattr(controller, "is_sending"):
                 self.logger(
-                    f"Sending reset command and stopping blossom {type_name.capitalize()} sending process",
+                    f"[Main] Sending reset command and stopping blossom {type_name.capitalize()} sending process",
                     level="info"
                 )
                 self.send_blossom_command(number, "reset")
                 QTimer.singleShot(50, stop)
             else:
-                self.logger(f"Blossom {number.capitalize()} server is not active.", level="warning")
+                self.logger(f"[Main] Blossom {number.capitalize()} server is not active.", level="warning")
 
         if action == "start":
             start()
@@ -582,7 +593,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 chunk = f.read()
                 self._log_pos = f.tell()
         except Exception as e:
-            self.logger(f"Failed to read logs: {e}", level="error")
+            self.logger(f"[Main] Failed to read logs: {e}", level="error")
             return
 
         if not chunk:

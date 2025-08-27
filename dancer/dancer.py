@@ -201,4 +201,4 @@ class Dancer:
     def _cooperative_sleep(self, seconds: float, step: float = 0.02):
         end = time.time() + max(0.0, seconds)
         while (self.is_running and not self._stop_event.is_set()) and time.time() < end:
-            time.sleep(min(step, end - time.time()))
+            time.sleep(max(step, end - time.time()))

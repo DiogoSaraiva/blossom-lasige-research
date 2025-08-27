@@ -80,7 +80,7 @@
       <rect>
        <x>10</x>
        <y>190</y>
-       <width>461</width>
+       <width>621</width>
        <height>101</height>
       </rect>
      </property>
@@ -115,15 +115,15 @@
      <widget class="QLabel" name="blossom_one_port_label">
       <property name="geometry">
        <rect>
-        <x>170</x>
+        <x>330</x>
         <y>30</y>
-        <width>140</width>
+        <width>130</width>
         <height>20</height>
        </rect>
       </property>
       <property name="minimumSize">
        <size>
-        <width>140</width>
+        <width>130</width>
         <height>20</height>
        </size>
       </property>
@@ -137,15 +137,15 @@
      <widget class="QLabel" name="blossom_two_port_label">
       <property name="geometry">
        <rect>
-        <x>310</x>
+        <x>470</x>
         <y>30</y>
-        <width>140</width>
+        <width>130</width>
         <height>20</height>
        </rect>
       </property>
       <property name="minimumSize">
        <size>
-        <width>140</width>
+        <width>130</width>
         <height>20</height>
        </size>
       </property>
@@ -193,7 +193,7 @@
      <widget class="QLineEdit" name="blossom_one_port">
       <property name="geometry">
        <rect>
-        <x>170</x>
+        <x>330</x>
         <y>60</y>
         <width>130</width>
         <height>30</height>
@@ -221,7 +221,7 @@
      <widget class="QLineEdit" name="blossom_two_port">
       <property name="geometry">
        <rect>
-        <x>310</x>
+        <x>470</x>
         <y>60</y>
         <width>130</width>
         <height>30</height>
@@ -244,6 +244,19 @@
       </property>
       <property name="placeholderText">
        <string>8002</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="get_current_ip">
+      <property name="geometry">
+       <rect>
+        <x>170</x>
+        <y>60</y>
+        <width>151</width>
+        <height>30</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Get Current IP</string>
       </property>
      </widget>
     </widget>
@@ -295,8 +308,8 @@
     <widget class="QGroupBox" name="mirroring">
      <property name="geometry">
       <rect>
-       <x>480</x>
-       <y>190</y>
+       <x>470</x>
+       <y>0</y>
        <width>151</width>
        <height>101</height>
       </rect>
@@ -386,9 +399,9 @@
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>10</y>
-       <width>601</width>
-       <height>80</height>
+       <y>0</y>
+       <width>441</width>
+       <height>101</height>
       </rect>
      </property>
      <property name="title">
@@ -399,13 +412,13 @@
        <rect>
         <x>10</x>
         <y>30</y>
-        <width>581</width>
-        <height>41</height>
+        <width>421</width>
+        <height>61</height>
        </rect>
       </property>
       <property name="font">
        <font>
-        <pointsize>18</pointsize>
+        <pointsize>26</pointsize>
        </font>
       </property>
       <property name="text">

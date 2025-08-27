@@ -1,8 +1,9 @@
-from PyQt6.QtWidgets import QDialog, QFileDialog, QMessageBox, QComboBox
 from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import QDialog, QFileDialog, QMessageBox, QComboBox
+
+from src import utils
 from src.settings import Settings
 from src.settings_dialog_ui import Ui_SettingsDialog
-from src.utils import get_local_ip, compact_timestamp
 
 try:
     from serial.tools import list_ports
@@ -18,7 +19,7 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         self.setupUi(self)
 
         # Base
-        self.study_id.setText(compact_timestamp())
+        self.study_id.setText(current.study_id)
         self.blossom_one_device.setCurrentText(current.blossom_one_device)
         self.blossom_two_device.setCurrentText(current.blossom_two_device)
         self._populate_serial_combos(
@@ -32,6 +33,7 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         self.flip_blossom.setChecked(_as_bool(current.flip_blossom))
         self.output_directory.setText(current.output_directory)
         self.browse_output_dir_button.clicked.connect(self._browse_output_dir)
+        self.get_current_ip.clicked.connect(lambda: self.host.setText(utils.get_local_ip()))
 
         # Gaze Tracking
         self.left_threshold.setText(str(current.left_threshold))
@@ -51,6 +53,7 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         self.music_directory.setText(current.music_directory)
         self.mic_sr.setValue(current.mic_sr)
         self.browse_music_dir_button.clicked.connect(self._browse_music_dir)
+
 
 
         self.buttonBox.accepted.connect(self._on_accept)
@@ -73,7 +76,7 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
     def _browse_output_dir(self):
         path = QFileDialog.getExistingDirectory(self, "Choose Output Directory", self.output_directory.text())
         if path:
-            self.output_directory.setText(path)
+            self.music_directory.setText(path)
 
     def _on_accept(self):
         try:
@@ -91,9 +94,8 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
                 left_threshold=float(self.left_threshold.text()),
                 right_threshold=float(self.right_threshold.text()),
                 # Mimetic
-                alpha_map={"x": float(self.alpha_map_x_value.text()), "y": float(self.alpha_map_y_value.text()),
-                           "z": float(self.alpha_map_z_value.text()), "h": float(self.alpha_map_h_value.text()),
-                           "e": float(self.alpha_map_e_value.text())},
+                alpha_map={"x": self.alpha_map_x_value.value(), "y": self.alpha_map_y_value.value(), "z": self.alpha_map_z_value.value(),
+                           "h": self.alpha_map_h_value.value(), "e": self.alpha_map_e_value.value()},
                 send_rate=int(self.send_rate.text()),
                 send_threshold=float(self.send_threshold.text()),
                 target_fps=int(self.target_fps.text()),
@@ -146,7 +148,7 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
             combo.clear()
             ports = self._list_acm_ports()
             if not ports:
-                combo.addItem("(no /dev/ttyACM found)")
+                combo.addItem("(no devs. found)")
                 combo.setEnabled(False)
                 return
             combo.addItems(ports)
