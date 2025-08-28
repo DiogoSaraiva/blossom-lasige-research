@@ -18,16 +18,32 @@ class MotionLimiter:
         values (dict): Stores the last value for each key.
     """
 
-    def __init__(self, logger: Logger, alpha_map: dict=None, send_rate: int=5, threshold: float=2.0, ):
+    def __init__(self, logger: Logger, alpha_map: dict=None, multiplier_map: dict = None, limit_map: dict = None, send_rate: int=5, threshold: float=2.0, ):
         self.logger = logger
         # Higher alpha value - Less filtered, lower time to respond
-        # Less alpha value - More filtered, higher time to respondr
+        # Less alpha value - More filtered, higher time to respond
         self.alpha_map = alpha_map or {
             "x": 0.4,  # pitch
             "y": 0.4,  # roll
             "z": 0.4,  # yaw
             "h": 0.2,  # height
             "e": 0.2   # ears
+        }
+        self.multiplier_map = multiplier_map or {}
+        self.limit_map = limit_map or {
+            "min": {
+                "x": -3.0,
+                "y": -3.0,
+                "z": -3.0,
+                "h": 50.0,
+                "e": 0.0,
+            }, "max": {
+                "x": 3.0,
+                "y": 3.0,
+                "z": 3.0,
+                "h": 100.0,
+                "e": 100.0,
+            }
         }
         self.smoothed = {
             "x": 0.0,
@@ -42,7 +58,7 @@ class MotionLimiter:
         self.last_data = self.smoothed.copy()
         self.values = {}
 
-    def smooth(self, key: str, value: float) -> float | None:
+    def smooth_and_multiply(self, key: str, value: float) -> float | None:
         """
         Applies exponential smoothing to the value and returns the result.
         Does not scale or normalize the result.
@@ -56,11 +72,16 @@ class MotionLimiter:
         """
         if value is None:
             return None
-        alpha = self.alpha_map.get(key, 0.3)
-        prev = self.smoothed.get(key, 0.0)
+        alpha = self.alpha_map.get(key)
+        multiplier = self.multiplier_map.get(key, 1.0)
+        prev = self.smoothed.get(key)
+        min_v = self.limit_map.get("min").get(key)
+        max_v = self.limit_map.get("max").get(key)
         smoothed = alpha * value + (1 - alpha) * prev
+        multiplied = smoothed * multiplier
         self.smoothed[key] = smoothed
-        return smoothed
+        return np.clip(multiplied, min_v, max_v)
+
 
     def should_send(self, keys: list) -> tuple[bool, float | None]:
         """

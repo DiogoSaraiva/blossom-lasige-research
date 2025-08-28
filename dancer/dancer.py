@@ -110,9 +110,9 @@ class Dancer:
                     self.logger(f"[Dancer] Could not find duration for '{sequence}'", level="warning")
 
             seg = float(mood.get("mood_duration", self.analysis_interval))
-            end_ttime = time.time() + max(0.0, seg - self.resting_period)
-            while time.time() < end_ttime and not self._stop_event.is_set():
-                self._cooperative_sleep(min(self.resting_period, end_ttime - time.time()))
+            end_time = time.time() + max(0.0, seg - self.resting_period)
+            while time.time() < end_time and not self._stop_event.is_set():
+                self._cooperative_sleep(min(self.resting_period, end_time - time.time()))
             else:
                 self._cooperative_sleep(self.resting_period)
 
@@ -201,4 +201,4 @@ class Dancer:
     def _cooperative_sleep(self, seconds: float, step: float = 0.02):
         end = time.time() + max(0.0, seconds)
         while (self.is_running and not self._stop_event.is_set()) and time.time() < end:
-            time.sleep(min(step, end - time.time()))
+            time.sleep(max(step, end - time.time()))
