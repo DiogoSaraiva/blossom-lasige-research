@@ -50,13 +50,30 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.settings_mgr = SettingManager()
         self.settings = self.settings_mgr.load()
 
-        self.output_directory = self.settings.output_directory
-
+        #Base
         self.study_id = self.settings.study_id or compact_timestamp()
-        self.logger = Logger(f"{self.output_directory}/{self.study_id}/system_log.json", mode="system")
         self.host = self.settings.host or get_local_ip()
+        self.blossom_one_port = self.settings.blossom_one_port
+        self.blossom_two_port = self.settings.blossom_two_port
         self.mirror_video = self.settings.mirror_video
         self.flip_blossoms = self.settings.flip_blossoms
+        self.output_directory = self.settings.output_directory
+
+        #Mimetic
+        self.alpha_map = self.settings.alpha_map
+        self.multiplier_map = self.settings.multiplier_map
+        self.limit_map = self.settings.limit_map
+        self.send_rate = self.settings.send_rate
+        self.send_threshold = self.settings.send_threshold
+        self.cam_device = self.settings.cam_device
+
+        #Dancer
+        self.dancer_mode = self.settings.dancer_mode
+        self.analysis_interval = self.settings.analysis_interval
+        self.mic_sr = self.settings.mic_sr
+        self.music_directory = self.settings.music_directory
+
+        self.logger = Logger(f"{self.output_directory}/{self.study_id}/system_log.json", mode="system")
 
         self.capture_thread = FrameCaptureThread(logger=self.logger)
         self.capture_thread.start()
@@ -65,16 +82,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.log_timer.timeout.connect(self.load_logs_to_textedit) # type: ignore
         self.log_timer.start(200)
         self._last_log_index = 0
-
-        self.blossom_one_port = self.settings.blossom_one_port
-        self.blossom_two_port = self.settings.blossom_two_port
-
-        self.alpha_map = self.settings.alpha_map
-        self.multiplier_map = self.settings.multiplier_map
-        self.limit_map = self.settings.limit_map
-        self.send_rate = self.settings.send_rate
-        self.send_threshold = self.settings.send_threshold
-
 
         max_wait = 5
         start_time = time.time()
@@ -130,10 +137,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             flip_blossom=self.flip_blossoms,
         )
 
-        self.dancer_mode = self.settings.dancer_mode
-        self.analysis_interval = self.settings.analysis_interval
-        self.mic_sr = self.settings.mic_sr
-        self.music_directory = self.settings.music_directory
+
 
         self.dancer = Dancer(
             logger=self.logger,

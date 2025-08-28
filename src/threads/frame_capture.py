@@ -14,7 +14,7 @@ class FrameCaptureThread(threading.Thread):
         cam_index (int, optional): Index of the camera to capture from. Defaults to 0.
         logger (Logger, optional): Logger instance for logging messages.
     """
-    def __init__(self, logger:Logger, cam_index=0):
+    def __init__(self, logger:Logger, device:str):
         """
         Initializes the FrameCaptureThread with a camera index and a logger.
 
@@ -32,7 +32,7 @@ class FrameCaptureThread(threading.Thread):
         ]
 
         self.logger = logger
-        self.cap = cv2.VideoCapture(cam_index)
+        self.cap = cv2.VideoCapture(device)
         if not self.cap.isOpened():
             self.logger("[CaptureThread] Camera failed to open.", level="error")
             raise RuntimeError("Failed to open camera")
