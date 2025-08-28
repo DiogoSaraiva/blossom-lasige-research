@@ -29,8 +29,8 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         self.host.setText(current.host)
         self.blossom_one_port.setText(str(current.blossom_one_port))
         self.blossom_two_port.setText(str(current.blossom_two_port))
-        self.mirror_video.setChecked(_as_bool(current.mirror_video))
-        self.flip_blossom.setChecked(_as_bool(current.flip_blossom))
+        self.mirror_video.setChecked(bool(current.mirror_video))
+        self.flip_blossom.setChecked(bool(current.flip_blossoms))
         self.output_directory.setText(current.output_directory)
         self.browse_output_dir_button.clicked.connect(self._browse_output_dir)
         self.get_current_ip.clicked.connect(lambda: self.host.setText(utils.get_local_ip()))
@@ -45,6 +45,21 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         self.alpha_map_z_value.setValue(current.alpha_map['z'])
         self.alpha_map_h_value.setValue(current.alpha_map['h'])
         self.alpha_map_e_value.setValue(current.alpha_map['e'])
+        self.x_min.setValue(current.limit_map.get("min").get("x"))
+        self.x_max.setValue(current.limit_map.get("max").get("x"))
+        self.y_min.setValue(current.limit_map.get("min").get("y"))
+        self.y_max.setValue(current.limit_map.get("max").get("y"))
+        self.z_min.setValue(current.limit_map.get("min").get("z"))
+        self.z_max.setValue(current.limit_map.get("max").get("z"))
+        self.h_min.setValue(current.limit_map.get("min").get("h"))
+        self.h_max.setValue(current.limit_map.get("max").get("h"))
+        self.e_min.setValue(current.limit_map.get("min").get("e"))
+        self.e_max.setValue(current.limit_map.get("max").get("e"))
+        self.multiplier_map_x_value.setValue(current.multiplier_map['x'])
+        self.multiplier_map_y_value.setValue(current.multiplier_map['y'])
+        self.multiplier_map_z_value.setValue(current.multiplier_map['z'])
+        self.multiplier_map_h_value.setValue(current.multiplier_map['h'])
+        self.multiplier_map_e_value.setValue(current.multiplier_map['e'])
         self.send_rate.setValue(current.send_rate)
         self.send_threshold.setValue(current.send_threshold)
 
@@ -70,13 +85,13 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
     def _browse_music_dir(self):
         path = QFileDialog.getExistingDirectory(self, "Choose Music Directory", self.music_directory.text())
         if path:
-            self.output_directory.setText(path)
+            self.music_directory.setText(path)
 
 
     def _browse_output_dir(self):
         path = QFileDialog.getExistingDirectory(self, "Choose Output Directory", self.output_directory.text())
         if path:
-            self.music_directory.setText(path)
+            self.output_directory.setText(path)
 
     def _on_accept(self):
         try:
@@ -88,7 +103,7 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
                 blossom_one_port=int(self.blossom_one_port.text()),
                 blossom_two_port=int(self.blossom_two_port.text()),
                 mirror_video=self.mirror_video.isChecked(),
-                flip_blossom=self.flip_blossom.isChecked(),
+                flip_blossoms=self.flip_blossom.isChecked(),
                 output_directory=self.output_directory.text().strip(),
                 # Gaze Tracking
                 left_threshold=float(self.left_threshold.text()),
@@ -96,6 +111,11 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
                 # Mimetic
                 alpha_map={"x": self.alpha_map_x_value.value(), "y": self.alpha_map_y_value.value(), "z": self.alpha_map_z_value.value(),
                            "h": self.alpha_map_h_value.value(), "e": self.alpha_map_e_value.value()},
+                multiplier_map={"x": self.multiplier_map_x_value.value(), "y": self.multiplier_map_y_value.value(),
+                                "z": self.multiplier_map_z_value.value(), "h": self.multiplier_map_h_value.value(),
+                                "e": self.multiplier_map_e_value.value()},
+                limit_map={"min": {"x": self.x_min.value(), "y": self.y_min.value(), "z": self.z_min.value(), "h": self.h_min.value(), "e": self.e_min.value()},
+                           "max": {"x": self.x_max.value(), "y": self.y_max.value(), "z": self.z_max.value(), "h": self.h_max.value(), "e": self.e_max.value()}},
                 send_rate=int(self.send_rate.text()),
                 send_threshold=float(self.send_threshold.text()),
                 target_fps=int(self.target_fps.text()),
@@ -120,13 +140,15 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         self.settings_applied.emit(new) # type: ignore
         self.accept()
 
-    def _current_combo_value(self, combo: QComboBox) -> str:
+    @staticmethod
+    def _current_combo_value(combo: QComboBox) -> str:
         if combo is None:
             return ""
         txt = combo.currentText().strip()
         return "" if txt.startswith("(") and "ttyACM" in txt else txt
 
-    def _list_acm_ports(self) -> list[str]:
+    @staticmethod
+    def _list_acm_ports() -> list[str]:
         if list_ports is None:
             return []
         ports = []
@@ -164,7 +186,7 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         if hasattr(self, "blossom_two_device"):
             fill(self.blossom_two_device, current_two or "")
 
-def _as_bool(v):
+def _as_bool(v) -> bool:
     if isinstance(v, bool):
         return v
     return str(v).strip().lower() in {"1", "true", "yes", "on"}

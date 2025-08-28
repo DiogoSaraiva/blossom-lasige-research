@@ -56,7 +56,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.logger = Logger(f"{self.output_directory}/{self.study_id}/system_log.json", mode="system")
         self.host = self.settings.host or get_local_ip()
         self.mirror_video = self.settings.mirror_video
-        self.flip_blossom = self.settings.flip_blossom
+        self.flip_blossoms = self.settings.flip_blossoms
 
         self.capture_thread = FrameCaptureThread(logger=self.logger)
         self.capture_thread.start()
@@ -70,8 +70,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.blossom_two_port = self.settings.blossom_two_port
 
         self.alpha_map = self.settings.alpha_map
+        self.multiplier_map = self.settings.multiplier_map
+        self.limit_map = self.settings.limit_map
         self.send_rate = self.settings.send_rate
         self.send_threshold = self.settings.send_threshold
+
 
         max_wait = 5
         start_time = time.time()
@@ -120,8 +123,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             },
             left_threshold=self.settings.left_threshold, right_threshold=self.settings.right_threshold,
             alpha_map=self.alpha_map,
+            multiplier_map=self.multiplier_map,
+            limit_map=self.limit_map,
             send_rate=self.send_rate,
             send_threshold=self.send_threshold,
+            flip_blossom=self.flip_blossoms,
         )
 
         self.dancer_mode = self.settings.dancer_mode
@@ -183,13 +189,22 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.settings = new
         self.settings_mgr.save(new)
 
-        self.mirror_video = new.mirror_video
-        self.flip_blossom = new.flip_blossom
+        changed_study_id = (old.study_id != new.study_id)
         changed_output_directory = (old.output_directory != new.output_directory)
         changed_thresholds = old.left_threshold != new.left_threshold or old.right_threshold != new.right_threshold
         changed_alpha_map = old.alpha_map != new.alpha_map
+        changed_multiplier_map = old.multiplier_map != new.multiplier_map
+        changed_limit_map = old.limit_map != new.limit_map
         changed_send_rate = old.send_rate != new.send_rate
         changed_send_threshold = old.send_threshold != new.send_threshold
+        changed_mirror_video = old.mirror_video != new.mirror_video
+        changed_flip_blossoms = old.flip_blossoms != new.flip_blossoms
+        changed_host = (old.host != new.host)
+        changed_blossom_one_port = (old.blossom_one_port != new.blossom_one_port)
+        changed_blossom_two_port = (old.blossom_two_port != new.blossom_two_port)
+        changed_blossom_one_endpoint = changed_host or changed_blossom_one_port
+        changed_blossom_two_endpoint = changed_host or changed_blossom_two_port
+        changed_music_directory = (old.music_directory != new.music_directory)
 
         if changed_thresholds:
             try:
@@ -198,27 +213,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             except Exception as e:
                 self.logger(f"[Main] Failed to apply thresholds: {e}", level="error")
 
-        if changed_alpha_map:
+        if changed_alpha_map or changed_multiplier_map or changed_limit_map or changed_send_rate or changed_send_threshold:
             self.mimetic.limiter.alpha_map = new.alpha_map
-            self.logger(f"[Main] Updated for new alpha_map: {new.alpha_map}", level="info")
-
-        if changed_send_rate:
             self.mimetic.limiter.send_rate = new.send_rate
-            self.logger(f"[Main] Updated for new send_rate: {new.send_rate}", level="info")
-
-        if changed_send_threshold:
             self.mimetic.limiter.send_threshold = new.send_threshold
-            self.logger(f"[Main] Updated for new send_threshold: {new.send_threshold}", level="info")
-
-        changed_host = (old.host != new.host)
-        changed_blossom_one_port = (old.blossom_one_port != new.blossom_one_port)
-        changed_blossom_two_port = (old.blossom_two_port != new.blossom_two_port)
+            self.mimetic.limiter.multiplier_map = new.multiplier_map
+            self.mimetic.limiter.limit_map = new.limit_map
+            self.logger(f"[Main] Updated for new mimetic motion limiter values.", level="info")
 
 
-        changed_blossom_one_endpoint = changed_host or changed_blossom_one_port
-        changed_blossom_two_endpoint = changed_host or changed_blossom_two_port
-
-        changed_study_id = (old.study_id != new.study_id)
+        if changed_music_directory:
+            self.mimetic.music_directory = new.music_directory
 
         if changed_study_id:
             self.study_id = new.study_id
@@ -230,8 +235,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         if changed_host:
             self.host = new.host
-            self.blossom_one_sender.host = new.host
-            self.blossom_two_sender.host = new.host
             self.logger(f"[Main] Updated for new host: {new.host}", level="info")
 
         one_type = self.get_blossom_type("one")
@@ -243,14 +246,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.blossom_one_port = new.blossom_one_port
             if blossom_one_attr and hasattr(blossom_one_attr, "port"):
                 blossom_one_attr.port = new.blossom_one_port
-            self.blossom_one_sender.port = new.blossom_one_port
             self.logger(f"[Main] Changed to new {one_type} endpoint: {new.host}:{new.blossom_one_port}", level="info")
 
         if changed_blossom_two_endpoint:
             self.blossom_two_port = new.blossom_two_port
             if blossom_two_attr and hasattr(blossom_two_attr, "port"):
                 blossom_two_attr.port = new.blossom_two_port
-            self.blossom_two_sender.port = new.blossom_two_port
             self.logger(f"[Main] Changed to new {two_type} endpoint: {new.host}:{new.blossom_two_port}", level="info")
 
         if changed_output_directory:
@@ -264,10 +265,24 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.logger(f"[Main] Output directory successfully changed to {self.output_directory}/{self.study_id}", level="info")
             self.logger.output_path = f"{self.output_directory}/{self.study_id}/system_log.json"
 
-        self.logger("Settings applied.", level="info")
+        if changed_flip_blossoms:
+            self.flip_blossoms = new.flip_blossoms
+            self.mimetic.flip_blossoms = new.flip_blossoms
+            self.logger(f"[Main] Updated for new flip_blossoms setting: {new.flip_blossoms}", level="info")
+
+        if changed_mirror_video:
+            self.mirror_video = new.mirror_video
+            self.logger(f"[Main] Changed to new mirror_video setting: {new.mirror_video}", level="info")
+
+        if (changed_blossom_one_endpoint or changed_blossom_two_endpoint or changed_output_directory or changed_flip_blossoms or
+            changed_mirror_video or changed_thresholds or changed_alpha_map or changed_send_threshold or changed_send_rate or
+            changed_study_id or changed_music_directory or changed_multiplier_map or changed_limit_map):
+            self.logger("[Main] Settings applied.", level="info")
+        else:
+            self.logger("[Main] No changes to be applied.", level="info")
 
     def update_video_frame(self):
-        frame = self.capture_thread.get_frame(mirror_video=self.settings.mirror_video)
+        frame = self.capture_thread.get_frame(mirror_video=self.mirror_video)
         if frame is None:
             return
 
@@ -423,7 +438,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.blossom_yaw_value.setText(format_val(z, 'rad'))
         self.blossom_height_value.setText(format_val(h))
         self.blossom_ears_value.setText(format_val(e))
-        self.data_sent.setChecked(bool(data_sent))
+        self.data_sent.setChecked(bool(data_sent) if (self.mimetic.is_sending_one or self.mimetic.is_sending_two) else False)
 
     def launch_blossom(self, mode: Literal["mimetic", "dancer"], number: Literal["one", "two"]):
         attr = f"blossom_{number}_launcher"

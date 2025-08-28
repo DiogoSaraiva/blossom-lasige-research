@@ -16,8 +16,10 @@ from src.utils import compact_timestamp
 class Mimetic:
     def __init__(self, output_directory: str, study_id: str | int, mirror_video: bool,
                  capture_thread: FrameCaptureThread, logger: dict[str, Logger], alpha_map: dict[str, float],
+                 multiplier_map: dict[str, float], limit_map: dict[str, dict[str, float]],
                  send_rate: int, send_threshold: float,
-                 left_threshold: float = 0.45, right_threshold: float = 0.55):
+                 left_threshold: float = 0.45, right_threshold: float = 0.55, flip_blossom: bool = False,):
+        self.flip_blossom = flip_blossom
         self._stop_event = threading.Event()
         self._thread = None
         self.output_directory = output_directory or "./output"
@@ -30,7 +32,7 @@ class Mimetic:
         )
         self.mirror_video = bool(mirror_video)
         self.capture_thread = capture_thread or FrameCaptureThread(logger=self.logger)
-        self.limiter = MotionLimiter(logger=self.logger, alpha_map=alpha_map, send_rate=send_rate, threshold=send_threshold)
+        self.limiter = MotionLimiter(logger=self.logger, alpha_map=alpha_map, multiplier_map=multiplier_map, limit_map=limit_map, send_rate=send_rate, threshold=send_threshold)
         self.pose_buffer = PoseBuffer(logger=self.logger)
         self.cam_view_title = "Pose Estimation" + (" (Mirrored)" if self.mirror_video else "")
         self.is_running = False
@@ -104,11 +106,11 @@ class Mimetic:
                 yaw = np.clip(yaw, -30, 30)
 
                 # Smooth pose values
-                x = np.radians(self.limiter.smooth('x', pitch))
-                y = np.radians(self.limiter.smooth('y', roll))
-                z = np.radians(self.limiter.smooth('z', yaw))
-                h = self.limiter.smooth('h', height)
-                e = self.limiter.smooth('e', height)
+                x = np.radians(self.limiter.smooth_and_multiply('x', pitch))
+                y = np.radians(self.limiter.smooth_and_multiply('y', roll))
+                z = np.radians(self.limiter.smooth_and_multiply('z', yaw))
+                h = self.limiter.smooth_and_multiply('h', height)
+                e = self.limiter.smooth_and_multiply('e', height)
 
                 axis = {'pitch': pitch, 'roll': roll, 'yaw': yaw}
                 should_send, duration = self.limiter.should_send(["x", "y", "z", "h"])
@@ -122,7 +124,8 @@ class Mimetic:
                     "ax": 0,
                     "ay": 0,
                     "az": -1,
-                    "duration_ms": int(duration * 1000) if duration else 500
+                    "duration_ms": int(duration * 1000) if duration else 500,
+                    "mirror": self.flip_blossom,
                 }
                 self.data = {
                     "data_sent": False,
@@ -167,7 +170,7 @@ class Mimetic:
         self.left_threshold, self.right_threshold = left_threshold, right_threshold
         if self.is_running:
             self.mp_thread = MediaPipeThread(result_buffer=self.pose_buffer, logger=self.logger,
-                                         left_threshold=self.left_threshold, right_threshold=self.right_threshold)
+                                         left_threshold=self.left_threshold, right_threshold=self.right_threshold, mirror_video=self.mirror_video)
 
     def update_output_directory(self, directory):
         self.output_directory = directory
@@ -206,7 +209,7 @@ class Mimetic:
         frame_height, frame_width = frame_display.shape[:2]
         self.logger(f"[INFO] Detected camera with resolution: {frame_width}x{frame_height}")
         self.mp_thread = MediaPipeThread(result_buffer=self.pose_buffer, logger=self.logger,
-                                         left_threshold=self.left_threshold, right_threshold=self.right_threshold)
+                                         left_threshold=self.left_threshold, right_threshold=self.right_threshold, mirror_video=self.mirror_video)
         self.mp_thread.start()
         return frame_width, frame_height
 
