@@ -35,7 +35,7 @@ class FrameCaptureThread(threading.Thread):
         self.cap = cv2.VideoCapture(device)
         if not self.cap.isOpened():
             self.logger("[CaptureThread] Camera failed to open.", level="error")
-            raise RuntimeError("Failed to open camera")
+            self.logger(f"[CaptureThread] Failed to open camera: {device}", level="error")
         for width, height in resolutions:
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
             self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)

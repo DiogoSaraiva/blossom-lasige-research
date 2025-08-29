@@ -56,5 +56,4 @@ class GazeEstimator:
         if self.mirror and label in ("left", "right"):
             label = "left" if label == "right" else "right"
 
-
         return label, self.smooth_ratio

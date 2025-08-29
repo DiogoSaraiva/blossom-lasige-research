@@ -1,3 +1,5 @@
+from typing import Literal
+
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QDialog, QFileDialog, QMessageBox, QComboBox
 
@@ -6,9 +8,9 @@ from src.settings import Settings
 from src.settings_dialog_ui import Ui_SettingsDialog
 
 try:
-    from serial.tools import list_ports
+    from serial.tools import list_ports as list_com_ports
 except Exception:
-    list_ports = None
+    list_com_ports = None
 
 class SettingsDialog(QDialog, Ui_SettingsDialog):
     settings_applied = pyqtSignal(Settings)
@@ -22,9 +24,10 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         self.study_id.setText(current.study_id)
         self.blossom_one_device.setCurrentText(current.blossom_one_device)
         self.blossom_two_device.setCurrentText(current.blossom_two_device)
-        self._populate_serial_combos(
+        self.populate_devices_combos(
             current_one=getattr(current, "blossom_one_device", ""),
-            current_two=getattr(current, "blossom_two_device", "")
+            current_two=getattr(current, "blossom_two_device", ""),
+            current_cam=getattr(current, "cam_device", "")
         )
         self.host.setText(current.host)
         self.blossom_one_port.setText(str(current.blossom_one_port))
@@ -36,8 +39,8 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         self.get_current_ip.clicked.connect(lambda: self.host.setText(utils.get_local_ip()))
 
         # Gaze Tracking
-        self.left_threshold.setText(str(current.left_threshold))
-        self.right_threshold.setText(str(current.right_threshold))
+        self.left_threshold.setValue(current.left_threshold)
+        self.right_threshold.setValue(current.right_threshold)
 
         # Mimetic
         self.alpha_map_x_value.setValue(current.alpha_map['x'])
@@ -76,11 +79,12 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
 
     def showEvent(self, event):
         super().showEvent(event)
-        self._populate_serial_combos(
+        self.populate_devices_combos(
             current_one=self._current_combo_value(self.blossom_one_device) if hasattr(self,
                                                                                       "blossom_one_device") else "",
             current_two=self._current_combo_value(self.blossom_two_device) if hasattr(self,
                                                                                       "blossom_two_device") else "",
+            current_cam=self._current_combo_value(self.cam_device) if hasattr(self, "cam_device") else "",
         )
     def _browse_music_dir(self):
         path = QFileDialog.getExistingDirectory(self, "Choose Music Directory", self.music_directory.text())
@@ -119,6 +123,7 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
                 send_rate=int(self.send_rate.text()),
                 send_threshold=float(self.send_threshold.text()),
                 target_fps=int(self.target_fps.text()),
+                cam_device=self.cam_device.currentText(),
                 # Dancer
                 music_directory=self.music_directory.text().strip(),
                 dancer_mode=self.dancer_mode.currentText(),
@@ -147,44 +152,50 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         txt = combo.currentText().strip()
         return "" if txt.startswith("(") and "ttyACM" in txt else txt
 
-    @staticmethod
-    def _list_acm_ports() -> list[str]:
-        if list_ports is None:
-            return []
-        ports = []
-        for p in list_ports.comports():
-            dev = getattr(p, "device", "") or ""
-            if dev.startswith("/dev/ttyACM"):
-                ports.append(dev)
 
-        def acm_key(d: str):
-            try:
-                return int(d.replace("/dev/ttyACM", ""))
-            except ValueError:
-                return 9999
+    def populate_devices_combos(self, current_one: str = "", current_two: str = "", current_cam: str = ""):
+        import re
+        import glob
+        from serial.tools import list_ports
 
-        return sorted(ports, key=acm_key)
+        def key(dev: str) -> int:
+            # Ordena por sufixo numérico (e.g., ttyACM0 → 0, video2 → 2)
+            m = re.search(r'(\d+)$', dev)
+            return int(m.group(1)) if m else 9999
 
-    def _populate_serial_combos(self, current_one: str = "", current_two: str = ""):
-        def fill(combo: QComboBox, cur: str):
+        def list_dev(mode: Literal["acm", "cam"]) -> list[str]:
+            if mode == "acm":
+                devs = [p.device for p in list_ports.comports() if getattr(p, "device", "").startswith("/dev/ttyACM")]
+            else:  # "cam"
+                devs = [d for d in glob.glob("/dev/video*")]
+            return sorted(devs, key=key)
+
+        def fill(mode: Literal["acm", "cam"], combo: QComboBox, cur: str):
+            combo.blockSignals(True)
             combo.clear()
-            ports = self._list_acm_ports()
-            if not ports:
-                combo.addItem("(no devs. found)")
-                combo.setEnabled(False)
-                return
-            combo.addItems(ports)
-            combo.setEnabled(True)
-            if cur and cur in ports:
-                combo.setCurrentText(cur)
-            elif cur and cur not in ports:
-                combo.insertItem(0, f"{cur} (current)")
-                combo.setCurrentIndex(0)
 
-        if hasattr(self, "blossom_one_device"):
-            fill(self.blossom_one_device, current_one or "")
-        if hasattr(self, "blossom_two_device"):
-            fill(self.blossom_two_device, current_two or "")
+            items = list_dev(mode)
+            if not items:
+                combo.addItem("(no devs. found)" if mode == "acm" else "(no cams found)")
+                combo.setEnabled(False)
+            else:
+                combo.addItems(items)
+                combo.setEnabled(True)
+                if cur:
+                    if cur in items:
+                        combo.setCurrentText(cur)
+                    else:
+                        combo.insertItem(0, f"{cur} (current)")
+                        combo.setCurrentIndex(0)
+
+            combo.blockSignals(False)
+
+        fill("acm", self.blossom_one_device, current_one or "")
+        fill("acm", self.blossom_two_device, current_two or "")
+        fill("cam", self.cam_device, current_cam or "")
+
+
+
 
 def _as_bool(v) -> bool:
     if isinstance(v, bool):

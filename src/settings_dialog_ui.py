@@ -138,103 +138,37 @@ class Ui_SettingsDialog(object):
         self.gaze_tab = QtWidgets.QWidget()
         self.gaze_tab.setObjectName("gaze_tab")
         self.gaze_calibration = QtWidgets.QGroupBox(parent=self.gaze_tab)
-        self.gaze_calibration.setGeometry(QtCore.QRect(10, 10, 521, 191))
+        self.gaze_calibration.setGeometry(QtCore.QRect(10, 10, 401, 131))
         self.gaze_calibration.setLocale(QtCore.QLocale(QtCore.QLocale.Language.English, QtCore.QLocale.Country.UnitedStates))
         self.gaze_calibration.setObjectName("gaze_calibration")
         self.left_looking = QtWidgets.QGroupBox(parent=self.gaze_calibration)
-        self.left_looking.setGeometry(QtCore.QRect(10, 30, 170, 141))
+        self.left_looking.setGeometry(QtCore.QRect(20, 30, 170, 81))
         self.left_looking.setMaximumSize(QtCore.QSize(280, 150))
         self.left_looking.setLocale(QtCore.QLocale(QtCore.QLocale.Language.English, QtCore.QLocale.Country.UnitedStates))
         self.left_looking.setObjectName("left_looking")
-        self.left_threshold = QtWidgets.QLineEdit(parent=self.left_looking)
-        self.left_threshold.setGeometry(QtCore.QRect(20, 60, 113, 27))
-        self.left_threshold.setLocale(QtCore.QLocale(QtCore.QLocale.Language.English, QtCore.QLocale.Country.UnitedStates))
+        self.left_threshold = QtWidgets.QDoubleSpinBox(parent=self.left_looking)
+        self.left_threshold.setGeometry(QtCore.QRect(30, 40, 80, 28))
+        self.left_threshold.setMaximum(0.5)
+        self.left_threshold.setSingleStep(0.01)
+        self.left_threshold.setProperty("value", 0.45)
         self.left_threshold.setObjectName("left_threshold")
-        self.is_left_looking = QtWidgets.QCheckBox(parent=self.left_looking)
-        self.is_left_looking.setEnabled(False)
-        self.is_left_looking.setGeometry(QtCore.QRect(20, 30, 130, 25))
-        self.is_left_looking.setMinimumSize(QtCore.QSize(130, 25))
-        self.is_left_looking.setMaximumSize(QtCore.QSize(130, 25))
-        self.is_left_looking.setStyleSheet("QCheckBox::indicator {\n"
-"    width: 20px;\n"
-"    height: 20px;\n"
-"    border-radius: 3px;\n"
-"    border: 1px solid #444;\n"
-"}\n"
-"QCheckBox::indicator:checked {\n"
-"    background-color: green;\n"
-"}\n"
-"QCheckBox::indicator:unchecked {\n"
-"    background-color: rgb(192, 191, 188);\n"
-"}")
-        self.is_left_looking.setLocale(QtCore.QLocale(QtCore.QLocale.Language.English, QtCore.QLocale.Country.UnitedStates))
-        self.is_left_looking.setCheckable(True)
-        self.is_left_looking.setChecked(False)
-        self.is_left_looking.setObjectName("is_left_looking")
-        self.set_current_left = QtWidgets.QPushButton(parent=self.left_looking)
-        self.set_current_left.setGeometry(QtCore.QRect(30, 100, 88, 27))
-        self.set_current_left.setLocale(QtCore.QLocale(QtCore.QLocale.Language.English, QtCore.QLocale.Country.UnitedStates))
-        self.set_current_left.setObjectName("set_current_left")
         self.right_looking = QtWidgets.QGroupBox(parent=self.gaze_calibration)
-        self.right_looking.setGeometry(QtCore.QRect(340, 30, 170, 141))
+        self.right_looking.setGeometry(QtCore.QRect(210, 30, 170, 81))
         self.right_looking.setMaximumSize(QtCore.QSize(280, 150))
         self.right_looking.setLocale(QtCore.QLocale(QtCore.QLocale.Language.English, QtCore.QLocale.Country.UnitedStates))
         self.right_looking.setObjectName("right_looking")
-        self.right_threshold = QtWidgets.QLineEdit(parent=self.right_looking)
-        self.right_threshold.setGeometry(QtCore.QRect(20, 60, 113, 27))
-        self.right_threshold.setLocale(QtCore.QLocale(QtCore.QLocale.Language.English, QtCore.QLocale.Country.UnitedStates))
+        self.right_threshold = QtWidgets.QDoubleSpinBox(parent=self.right_looking)
+        self.right_threshold.setGeometry(QtCore.QRect(20, 40, 80, 28))
+        self.right_threshold.setMinimum(0.5)
+        self.right_threshold.setMaximum(1.0)
+        self.right_threshold.setSingleStep(0.01)
+        self.right_threshold.setProperty("value", 0.55)
         self.right_threshold.setObjectName("right_threshold")
-        self.is_right_looking = QtWidgets.QCheckBox(parent=self.right_looking)
-        self.is_right_looking.setEnabled(False)
-        self.is_right_looking.setGeometry(QtCore.QRect(20, 30, 130, 25))
-        self.is_right_looking.setMinimumSize(QtCore.QSize(130, 25))
-        self.is_right_looking.setMaximumSize(QtCore.QSize(130, 25))
-        self.is_right_looking.setStyleSheet("QCheckBox::indicator {\n"
-"    width: 20px;\n"
-"    height: 20px;\n"
-"    border-radius: 3px;\n"
-"    border: 1px solid #444;\n"
-"}\n"
-"QCheckBox::indicator:checked {\n"
-"    background-color: green;\n"
-"}\n"
-"QCheckBox::indicator:unchecked {\n"
-"    background-color: rgb(192, 191, 188);\n"
-"}")
-        self.is_right_looking.setLocale(QtCore.QLocale(QtCore.QLocale.Language.English, QtCore.QLocale.Country.UnitedStates))
-        self.is_right_looking.setCheckable(True)
-        self.is_right_looking.setChecked(False)
-        self.is_right_looking.setObjectName("is_right_looking")
-        self.set_current_right = QtWidgets.QPushButton(parent=self.right_looking)
-        self.set_current_right.setGeometry(QtCore.QRect(30, 100, 88, 27))
-        self.set_current_right.setLocale(QtCore.QLocale(QtCore.QLocale.Language.English, QtCore.QLocale.Country.UnitedStates))
-        self.set_current_right.setObjectName("set_current_right")
-        self.neutral_looking = QtWidgets.QCheckBox(parent=self.gaze_calibration)
-        self.neutral_looking.setEnabled(False)
-        self.neutral_looking.setGeometry(QtCore.QRect(190, 50, 140, 25))
-        self.neutral_looking.setMinimumSize(QtCore.QSize(1, 25))
-        self.neutral_looking.setMaximumSize(QtCore.QSize(140, 25))
-        self.neutral_looking.setStyleSheet("QCheckBox::indicator {\n"
-"    width: 20px;\n"
-"    height: 20px;\n"
-"    border-radius: 3px;\n"
-"    border: 1px solid #444;\n"
-"}\n"
-"QCheckBox::indicator:checked {\n"
-"    background-color: green;\n"
-"}\n"
-"QCheckBox::indicator:unchecked {\n"
-"    background-color: rgb(192, 191, 188);\n"
-"}")
-        self.neutral_looking.setLocale(QtCore.QLocale(QtCore.QLocale.Language.English, QtCore.QLocale.Country.UnitedStates))
-        self.neutral_looking.setCheckable(True)
-        self.neutral_looking.setChecked(False)
-        self.neutral_looking.setObjectName("neutral_looking")
         self.tabs.addTab(self.gaze_tab, "")
         self.mimetic_tab = QtWidgets.QWidget()
         self.mimetic_tab.setObjectName("mimetic_tab")
         self.motion_smooth_group = QtWidgets.QGroupBox(parent=self.mimetic_tab)
-        self.motion_smooth_group.setGeometry(QtCore.QRect(10, 10, 121, 211))
+        self.motion_smooth_group.setGeometry(QtCore.QRect(10, 10, 121, 221))
         self.motion_smooth_group.setObjectName("motion_smooth_group")
         self.alpha_map_x_value = QtWidgets.QDoubleSpinBox(parent=self.motion_smooth_group)
         self.alpha_map_x_value.setGeometry(QtCore.QRect(40, 40, 65, 28))
@@ -349,7 +283,7 @@ class Ui_SettingsDialog(object):
         self.target_fps.setProperty("value", 30)
         self.target_fps.setObjectName("target_fps")
         self.motion_multipliers_group = QtWidgets.QGroupBox(parent=self.mimetic_tab)
-        self.motion_multipliers_group.setGeometry(QtCore.QRect(140, 10, 121, 211))
+        self.motion_multipliers_group.setGeometry(QtCore.QRect(140, 10, 121, 221))
         self.motion_multipliers_group.setObjectName("motion_multipliers_group")
         self.multiplier_map_x_value = QtWidgets.QDoubleSpinBox(parent=self.motion_multipliers_group)
         self.multiplier_map_x_value.setGeometry(QtCore.QRect(40, 40, 65, 28))
@@ -533,6 +467,12 @@ class Ui_SettingsDialog(object):
         self.max = QtWidgets.QLabel(parent=self.motion_multipliers_group_2)
         self.max.setGeometry(QtCore.QRect(120, 40, 40, 19))
         self.max.setObjectName("max")
+        self.cam_device_group = QtWidgets.QGroupBox(parent=self.mimetic_tab)
+        self.cam_device_group.setGeometry(QtCore.QRect(10, 240, 461, 80))
+        self.cam_device_group.setObjectName("cam_device_group")
+        self.cam_device = QtWidgets.QComboBox(parent=self.cam_device_group)
+        self.cam_device.setGeometry(QtCore.QRect(10, 40, 441, 27))
+        self.cam_device.setObjectName("cam_device")
         self.tabs.addTab(self.mimetic_tab, "")
         self.dancer_tab = QtWidgets.QWidget()
         self.dancer_tab.setObjectName("dancer_tab")
@@ -587,7 +527,7 @@ class Ui_SettingsDialog(object):
         self.tabs.addTab(self.dancer_tab, "")
 
         self.retranslateUi(SettingsDialog)
-        self.tabs.setCurrentIndex(2)
+        self.tabs.setCurrentIndex(1)
         QtCore.QMetaObject.connectSlotsByName(SettingsDialog)
 
     def retranslateUi(self, SettingsDialog):
@@ -614,12 +554,7 @@ class Ui_SettingsDialog(object):
         self.tabs.setTabText(self.tabs.indexOf(self.base_tab), _translate("SettingsDialog", "Base"))
         self.gaze_calibration.setTitle(_translate("SettingsDialog", "Gaze Tracking Calibration"))
         self.left_looking.setTitle(_translate("SettingsDialog", "Left Looking Threshold"))
-        self.is_left_looking.setText(_translate("SettingsDialog", "Looking Left?"))
-        self.set_current_left.setText(_translate("SettingsDialog", "Set current"))
         self.right_looking.setTitle(_translate("SettingsDialog", "Right Looking Threshold"))
-        self.is_right_looking.setText(_translate("SettingsDialog", "Looking Right?"))
-        self.set_current_right.setText(_translate("SettingsDialog", "Set current"))
-        self.neutral_looking.setText(_translate("SettingsDialog", "Neutral Looking"))
         self.tabs.setTabText(self.tabs.indexOf(self.gaze_tab), _translate("SettingsDialog", "Gaze Tracking"))
         self.motion_smooth_group.setTitle(_translate("SettingsDialog", "Motion Smooth"))
         self.x.setText(_translate("SettingsDialog", "x"))
@@ -647,6 +582,7 @@ class Ui_SettingsDialog(object):
         self.e_3.setText(_translate("SettingsDialog", "e"))
         self.min.setText(_translate("SettingsDialog", "Min"))
         self.max.setText(_translate("SettingsDialog", "Max"))
+        self.cam_device_group.setTitle(_translate("SettingsDialog", "Camera Device"))
         self.tabs.setTabText(self.tabs.indexOf(self.mimetic_tab), _translate("SettingsDialog", "Mimetic"))
         self.music_directory_group.setTitle(_translate("SettingsDialog", "Music Directory"))
         self.browse_music_dir_button.setText(_translate("SettingsDialog", "Browse"))
