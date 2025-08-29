@@ -159,7 +159,6 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         from serial.tools import list_ports
 
         def key(dev: str) -> int:
-            # Ordena por sufixo numérico (e.g., ttyACM0 → 0, video2 → 2)
             m = re.search(r'(\d+)$', dev)
             return int(m.group(1)) if m else 9999
 
