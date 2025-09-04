@@ -14,7 +14,10 @@ class Dancer:
     def __init__(self, music_dir: str, logger: Logger, mode: Literal["mic", "audio"], analysis_interval: float = 5.0, mic_sr = 22050):
         """
         :param music_dir: Path to the music directory
+        :param logger: Logger instance for logging messages
+        :param mode: Analysis mode, either "mic" or "audio"
         :param analysis_interval: Interval in seconds to re-analyze mood
+        :param mic_sr: Microphone sample rate
         """
         self._run = None
         self._music_over = True
@@ -49,6 +52,7 @@ class Dancer:
         self.loop_playlist = True
 
     def _refresh_playlist(self):
+        """Refresh the playlist by loading all supported music files from the music directory."""
         try:
             files = [os.path.join(self.music_dir, f) for f in os.listdir(self.music_dir)]
             self._playlist = [p for p in files if os.path.splitext(p)[1].lower() in self._supported_extensions and os.path.isfile(p)]
@@ -61,6 +65,7 @@ class Dancer:
             self.logger(f"[Dancer] Failed to load playlist: {e}", level="error")
 
     def _get_next_music_path(self) -> Optional[str]:
+        """Return the path of the next track in the playlist, handling looping if enabled."""
         if not self._playlist:
             self._refresh_playlist()
             if not self._playlist:
@@ -74,6 +79,10 @@ class Dancer:
         return self._playlist[self._playlist_idx]
 
     def _main_loop(self):
+        """
+            Main loop of the Dancer. Plays music, analyzes mood, sends sequences to Blossoms,
+            and sleeps cooperatively between iterations.
+        """
         self.logger("[Dancer] Launching Dancer...", level="info")
         self.is_running = True
         while not self._stop_event.is_set() and self.is_running:
@@ -120,6 +129,7 @@ class Dancer:
         self.logger("[Dancer] Loop ended.", level="debug")
 
     def start(self):
+        """Start the Dancer thread and set the proper run method based on mode."""
         self.is_running = True
         self._run = self.run_for_mic if self.mode == "mic" else self.run_for_audio
         if self._thread is None or not self._thread.is_alive():
@@ -131,6 +141,7 @@ class Dancer:
             self.logger("[Dancer] Start called, but already running.", level="warning")
 
     def stop(self):
+        """Stop the Dancer, halt music playback, and join the thread if alive."""
         self.logger("[Dancer] Stopping...", level="info")
         self.music_player.stop()
         self.current_sequence = None
@@ -140,6 +151,7 @@ class Dancer:
         self.is_running = False
 
     def get_sequence_duration_ms(self, sequence: str) -> Optional[int]:
+        """Return the duration in milliseconds of a given sequence from its JSON file."""
         try:
             with open(f"blossom_public/src/sequences/woody/{sequence}_sequence.json", "r") as file:
                 sequence_json = json.load(file)
@@ -150,9 +162,11 @@ class Dancer:
             return None
 
     def run_for_mic(self) -> Dict[str, str | float]:
+        """Analyze mood using the microphone input."""
         return self.beat_detector.analyse_microphone()
 
     def run_for_audio(self) -> Optional[Dict[str, str | float]]:
+        """Analyze mood based on currently playing audio tracks."""
         if not self._music_schedule:
             self._music_schedule = self.beat_detector.analyse_music()
             self._current_schedule_index = 0
@@ -168,9 +182,11 @@ class Dancer:
         return mood
 
     def update_sender(self, number: Literal["one", "two"], blossom_sender: Optional[BlossomSenderThread]):
+        """Update the Blossom sender thread for the specified number (one or two)."""
         setattr(self, f"blossom_{number}_sender", blossom_sender)
 
     def start_sending(self, blossom_sender: BlossomSenderThread, number: Literal["one", "two"]):
+        """Start sending sequences to a Blossom if not already sending."""
         if not (self.is_sending_one or self.is_sending_two):
             self.start()
         if getattr(self, f"is_sending_{number}"):
@@ -182,6 +198,7 @@ class Dancer:
 
 
     def stop_sending(self, blossom_sender: BlossomSenderThread, number: Literal["one", "two"]):
+        """Stop sending sequences to a Blossom and stop the thread if no other sending is active."""
         if not getattr(self, f"is_sending_{number}"):
             self.logger(f"[Dancer] Sending not enabled for Blossom {number.capitalize()}.", level="warning")
             return
@@ -192,6 +209,7 @@ class Dancer:
             self.stop()
 
     def change_music(self, music_path: str):
+        """Change the currently playing music and reset the analysis schedule."""
         self.beat_detector.change_music(music_path)
         self.music_player.play(music_path)
         self._music_schedule = []
@@ -199,6 +217,12 @@ class Dancer:
         self._music_over = False
 
     def _cooperative_sleep(self, seconds: float, step: float = 0.02):
+        """
+        Sleep in small steps to allow cooperative multitasking and early interruption.
+
+        :param seconds: Total time to sleep
+        :param step: Step size for each sleep iteration
+        """
         end = time.time() + max(0.0, seconds)
         while (self.is_running and not self._stop_event.is_set()) and time.time() < end:
             time.sleep(max(step, end - time.time()))

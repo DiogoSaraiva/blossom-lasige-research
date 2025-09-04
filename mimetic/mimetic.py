@@ -19,6 +19,23 @@ class Mimetic:
                  multiplier_map: dict[str, float], limit_map: dict[str, dict[str, float]],
                  send_rate: int, send_threshold: float,
                  left_threshold: float = 0.45, right_threshold: float = 0.55, flip_blossom: bool = False,):
+        """
+                Initialize the Mimetic class.
+
+                :param output_directory: Directory to save outputs/logs
+                :param study_id: Identifier for the study/session
+                :param mirror_video: Whether video should be mirrored
+                :param capture_thread: Thread that captures frames from the camera
+                :param logger: Dictionary of logger instances for system and pose logs
+                :param alpha_map: Alpha values for motion smoothing
+                :param multiplier_map: Multipliers for motion scaling
+                :param limit_map: Motion limits per axis
+                :param send_rate: Rate (Hz) to send pose data
+                :param send_threshold: Minimum threshold for sending data
+                :param left_threshold: Left-side threshold for MediaPipe detection
+                :param right_threshold: Right-side threshold for MediaPipe detection
+                :param flip_blossom: Whether to mirror data when sending to Blossom
+        """
         self.flip_blossom = flip_blossom
         self._stop_event = threading.Event()
         self._thread = None
@@ -49,9 +66,14 @@ class Mimetic:
 
 
     def update_sender(self, number: Literal["one", "two"], blossom_sender: BlossomSenderThread | None):
+        """Update the Blossom sender thread for the given number ('one' or 'two')."""
         setattr(self, f"blossom_{number}_sender", blossom_sender)
 
     def _main_loop(self):
+        """
+            Main loop for capturing frames, processing poses, smoothing data,
+            and sending updates to Blossoms if necessary.
+        """
         self.is_running = True
         last_pose_data = None
 
@@ -167,16 +189,19 @@ class Mimetic:
             self.is_running = False
 
     def update_threshold(self, left_threshold, right_threshold):
+        """Update left/right MediaPipe thresholds and restart MediaPipe thread if running."""
         self.left_threshold, self.right_threshold = left_threshold, right_threshold
         if self.is_running:
             self.mp_thread = MediaPipeThread(result_buffer=self.pose_buffer, logger=self.logger,
                                          left_threshold=self.left_threshold, right_threshold=self.right_threshold, mirror_video=self.mirror_video)
 
     def update_output_directory(self, directory):
+        """Update output directory and recreate pose logger with new path."""
         self.output_directory = directory
         self.pose_logger = Logger(f"{directory}/{self.study_id}/pose_log.json", mode="pose")
 
     def start_sending(self, blossom_sender: BlossomSenderThread, number: Literal["one", "two"]):
+        """Enable sending pose data to a specified Blossom sender."""
         if getattr(self, f"is_sending_{number}"):
             self.logger(f"[Mimetic] Sending already enabled for Blossom {number}.", level="warning")
             return
@@ -185,6 +210,7 @@ class Mimetic:
 
 
     def stop_sending(self, blossom_sender: BlossomSenderThread, number: Literal["one", "two"]):
+        """Stop sending pose data to a specified Blossom sender and join the thread."""
         if not getattr(self, f"is_sending_{number}"):
             self.logger(f"[Mimetic] Sending not enabled for Blossom {number}.", level="warning")
             return
@@ -194,6 +220,11 @@ class Mimetic:
 
 
     def initialize(self) -> Tuple[int, int]:
+        """
+            Initialize the camera and MediaPipe thread.
+
+            :return: Tuple of (frame_width, frame_height)
+        """
         timeout_sec = 5
         interval_sec = 0.01
         max_attempts = int(timeout_sec / interval_sec)
@@ -214,6 +245,10 @@ class Mimetic:
         return frame_width, frame_height
 
     def calibrate_pose(self):
+        """
+            Calibrate the pose by capturing a few frames with neutral head position
+            and computing average pitch, roll, and yaw offsets.
+        """
         if self.mp_thread is None:
             self.logger("[Mimetic] Cannot calibrate: MediaPipe thread is not initialized.", level="error")
             return
@@ -252,6 +287,7 @@ class Mimetic:
             raise RuntimeError("Failed calibration: No valid frame captured.")
 
     def start(self):
+        """Start the Mimetic main thread for capturing and processing poses."""
         if self._thread is None or not self._thread.is_alive():
             self._stop_event.clear()
             self._thread = threading.Thread(target=self._main_loop, daemon=True)
@@ -261,6 +297,7 @@ class Mimetic:
             self.logger("[Mimetic] Start called, but already running.", level="warning")
 
     def stop(self):
+        """Stop the Mimetic main thread and MediaPipe thread."""
         self.logger("[Mimetic] Stopping...", level="info")
         self.data = None
         self._stop_event.set()

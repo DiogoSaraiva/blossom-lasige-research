@@ -11,6 +11,12 @@ from src.logging_utils import Logger
 
 class MusicPlayer:
     def __init__(self, logger: Logger, target_sr: int = 22050):
+        """
+        Initialize the MusicPlayer.
+
+        :param logger: Logger instance for logging messages
+        :param target_sr: Target sampling rate for audio playback
+        """
         self.logger = logger
         self.current_music_path: Optional[str] = None
         self.is_running: bool = False
@@ -20,6 +26,11 @@ class MusicPlayer:
         self._stop_event = threading.Event()
 
     def play(self, music_path: str):
+        """
+        Play an audio file in a separate thread. Stops any currently playing audio.
+
+        :param music_path: Path to the audio file to play
+        """
         self.stop()
 
         self.current_music_path = music_path
@@ -29,6 +40,9 @@ class MusicPlayer:
         self._thread.start()
 
     def stop(self):
+        """
+        Stop the current audio playback and terminate the playback thread.
+        """
         self._stop_event.set()
         try:
             sd.stop()
@@ -42,6 +56,10 @@ class MusicPlayer:
         self.is_running = False
 
     def _worker(self):
+        """
+        Worker thread that handles the actual audio playback.
+        Loads the audio file using librosa and plays it with sounddevice.
+        """
         path = self.current_music_path
         if not path:
             return
