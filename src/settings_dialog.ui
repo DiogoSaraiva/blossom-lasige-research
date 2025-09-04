@@ -63,7 +63,7 @@
     <enum>QTabWidget::Rounded</enum>
    </property>
    <property name="currentIndex">
-    <number>2</number>
+    <number>1</number>
    </property>
    <property name="elideMode">
     <enum>Qt::ElideNone</enum>
@@ -498,8 +498,8 @@
       <rect>
        <x>10</x>
        <y>10</y>
-       <width>521</width>
-       <height>191</height>
+       <width>401</width>
+       <height>131</height>
       </rect>
      </property>
      <property name="locale">
@@ -511,10 +511,10 @@
      <widget class="QGroupBox" name="left_looking">
       <property name="geometry">
        <rect>
-        <x>10</x>
+        <x>20</x>
         <y>30</y>
         <width>170</width>
-        <height>141</height>
+        <height>81</height>
        </rect>
       </property>
       <property name="maximumSize">
@@ -529,94 +529,33 @@
       <property name="title">
        <string>Left Looking Threshold</string>
       </property>
-      <widget class="QLineEdit" name="left_threshold">
-       <property name="geometry">
-        <rect>
-         <x>20</x>
-         <y>60</y>
-         <width>113</width>
-         <height>27</height>
-        </rect>
-       </property>
-       <property name="locale">
-        <locale language="English" country="UnitedStates"/>
-       </property>
-      </widget>
-      <widget class="QCheckBox" name="is_left_looking">
-       <property name="enabled">
-        <bool>false</bool>
-       </property>
-       <property name="geometry">
-        <rect>
-         <x>20</x>
-         <y>30</y>
-         <width>130</width>
-         <height>25</height>
-        </rect>
-       </property>
-       <property name="minimumSize">
-        <size>
-         <width>130</width>
-         <height>25</height>
-        </size>
-       </property>
-       <property name="maximumSize">
-        <size>
-         <width>130</width>
-         <height>25</height>
-        </size>
-       </property>
-       <property name="styleSheet">
-        <string notr="true">QCheckBox::indicator {
-    width: 20px;
-    height: 20px;
-    border-radius: 3px;
-    border: 1px solid #444;
-}
-QCheckBox::indicator:checked {
-    background-color: green;
-}
-QCheckBox::indicator:unchecked {
-    background-color: rgb(192, 191, 188);
-}</string>
-       </property>
-       <property name="locale">
-        <locale language="English" country="UnitedStates"/>
-       </property>
-       <property name="text">
-        <string>Looking Left?</string>
-       </property>
-       <property name="checkable">
-        <bool>true</bool>
-       </property>
-       <property name="checked">
-        <bool>false</bool>
-       </property>
-      </widget>
-      <widget class="QPushButton" name="set_current_left">
+      <widget class="QDoubleSpinBox" name="left_threshold">
        <property name="geometry">
         <rect>
          <x>30</x>
-         <y>100</y>
-         <width>88</width>
-         <height>27</height>
+         <y>40</y>
+         <width>80</width>
+         <height>28</height>
         </rect>
        </property>
-       <property name="locale">
-        <locale language="English" country="UnitedStates"/>
+       <property name="maximum">
+        <double>0.500000000000000</double>
        </property>
-       <property name="text">
-        <string>Set current</string>
+       <property name="singleStep">
+        <double>0.010000000000000</double>
+       </property>
+       <property name="value">
+        <double>0.450000000000000</double>
        </property>
       </widget>
      </widget>
      <widget class="QGroupBox" name="right_looking">
       <property name="geometry">
        <rect>
-        <x>340</x>
+        <x>210</x>
         <y>30</y>
         <width>170</width>
-        <height>141</height>
+        <height>81</height>
        </rect>
       </property>
       <property name="maximumSize">
@@ -631,137 +570,28 @@ QCheckBox::indicator:unchecked {
       <property name="title">
        <string>Right Looking Threshold</string>
       </property>
-      <widget class="QLineEdit" name="right_threshold">
+      <widget class="QDoubleSpinBox" name="right_threshold">
        <property name="geometry">
         <rect>
          <x>20</x>
-         <y>60</y>
-         <width>113</width>
-         <height>27</height>
+         <y>40</y>
+         <width>80</width>
+         <height>28</height>
         </rect>
        </property>
-       <property name="locale">
-        <locale language="English" country="UnitedStates"/>
+       <property name="minimum">
+        <double>0.500000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>1.000000000000000</double>
+       </property>
+       <property name="singleStep">
+        <double>0.010000000000000</double>
+       </property>
+       <property name="value">
+        <double>0.550000000000000</double>
        </property>
       </widget>
-      <widget class="QCheckBox" name="is_right_looking">
-       <property name="enabled">
-        <bool>false</bool>
-       </property>
-       <property name="geometry">
-        <rect>
-         <x>20</x>
-         <y>30</y>
-         <width>130</width>
-         <height>25</height>
-        </rect>
-       </property>
-       <property name="minimumSize">
-        <size>
-         <width>130</width>
-         <height>25</height>
-        </size>
-       </property>
-       <property name="maximumSize">
-        <size>
-         <width>130</width>
-         <height>25</height>
-        </size>
-       </property>
-       <property name="styleSheet">
-        <string notr="true">QCheckBox::indicator {
-    width: 20px;
-    height: 20px;
-    border-radius: 3px;
-    border: 1px solid #444;
-}
-QCheckBox::indicator:checked {
-    background-color: green;
-}
-QCheckBox::indicator:unchecked {
-    background-color: rgb(192, 191, 188);
-}</string>
-       </property>
-       <property name="locale">
-        <locale language="English" country="UnitedStates"/>
-       </property>
-       <property name="text">
-        <string>Looking Right?</string>
-       </property>
-       <property name="checkable">
-        <bool>true</bool>
-       </property>
-       <property name="checked">
-        <bool>false</bool>
-       </property>
-      </widget>
-      <widget class="QPushButton" name="set_current_right">
-       <property name="geometry">
-        <rect>
-         <x>30</x>
-         <y>100</y>
-         <width>88</width>
-         <height>27</height>
-        </rect>
-       </property>
-       <property name="locale">
-        <locale language="English" country="UnitedStates"/>
-       </property>
-       <property name="text">
-        <string>Set current</string>
-       </property>
-      </widget>
-     </widget>
-     <widget class="QCheckBox" name="neutral_looking">
-      <property name="enabled">
-       <bool>false</bool>
-      </property>
-      <property name="geometry">
-       <rect>
-        <x>190</x>
-        <y>50</y>
-        <width>140</width>
-        <height>25</height>
-       </rect>
-      </property>
-      <property name="minimumSize">
-       <size>
-        <width>1</width>
-        <height>25</height>
-       </size>
-      </property>
-      <property name="maximumSize">
-       <size>
-        <width>140</width>
-        <height>25</height>
-       </size>
-      </property>
-      <property name="styleSheet">
-       <string notr="true">QCheckBox::indicator {
-    width: 20px;
-    height: 20px;
-    border-radius: 3px;
-    border: 1px solid #444;
-}
-QCheckBox::indicator:checked {
-    background-color: green;
-}
-QCheckBox::indicator:unchecked {
-    background-color: rgb(192, 191, 188);
-}</string>
-      </property>
-      <property name="locale">
-       <locale language="English" country="UnitedStates"/>
-      </property>
-      <property name="text">
-       <string>Neutral Looking</string>
-      </property>
-      <property name="checkable">
-       <bool>true</bool>
-      </property>
-      <property name="checked">
-       <bool>false</bool>
-      </property>
      </widget>
     </widget>
    </widget>
@@ -775,7 +605,7 @@ QCheckBox::indicator:unchecked {
        <x>10</x>
        <y>10</y>
        <width>121</width>
-       <height>211</height>
+       <height>221</height>
       </rect>
      </property>
      <property name="title">
@@ -1168,7 +998,7 @@ QCheckBox::indicator:unchecked {
        <x>140</x>
        <y>10</y>
        <width>121</width>
-       <height>211</height>
+       <height>221</height>
       </rect>
      </property>
      <property name="title">
@@ -1775,6 +1605,29 @@ QCheckBox::indicator:unchecked {
       </property>
       <property name="text">
        <string>Max</string>
+      </property>
+     </widget>
+    </widget>
+    <widget class="QGroupBox" name="cam_device_group">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>240</y>
+       <width>461</width>
+       <height>80</height>
+      </rect>
+     </property>
+     <property name="title">
+      <string>Camera Device</string>
+     </property>
+     <widget class="QComboBox" name="cam_device">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>40</y>
+        <width>441</width>
+        <height>27</height>
+       </rect>
       </property>
      </widget>
     </widget>

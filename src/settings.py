@@ -30,6 +30,7 @@ class Settings:
     send_rate: int = 5
     send_threshold: float = 2.0
     target_fps: int = 30
+    cam_device: str = "/dev/video0"
 
     # Dancer
     dancer_mode: str = "mic"
@@ -73,6 +74,8 @@ class SettingManager:
         settings.send_threshold = float(self.qs.value("send_threshold", settings.send_threshold))
         settings.target_fps = int(self.qs.value("target_fps", settings.target_fps))
 
+        settings.cam_device = self.qs.value("cam_device", settings.cam_device)
+
         # Dancer
         settings.music_directory = self.qs.value("music_directory", settings.music_directory)
         settings.mic_sr = int(self.qs.value("mic_sr", settings.mic_sr))
@@ -104,13 +107,13 @@ class SettingManager:
         self.qs.setValue("send_threshold", settings.send_threshold)
         self.qs.setValue("send_rate", settings.send_rate)
         self.qs.setValue("target_fps", settings.target_fps)
+        self.qs.setValue("cam_device", settings.cam_device)
 
         # Dancer
         self.qs.setValue("dancer_mode", settings.dancer_mode)
         self.qs.setValue("analysis_interval", settings.analysis_interval)
         self.qs.setValue("mic_sr", settings.mic_sr)
         self.qs.setValue("music_directory", settings.music_directory)
-
 
         self.qs.sync()
 

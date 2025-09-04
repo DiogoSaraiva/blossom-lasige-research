@@ -1,6 +1,7 @@
 import json
 import subprocess
 import time
+from html import escape
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -24,13 +25,13 @@ from src.threads.mimetic_thread import MimeticRunnerThread
 from src.threads.recorder_thread import RecorderThread
 from src.utils import compact_timestamp, get_local_ip
 
-LOG_LEVEL = "debug"
+LOG_LEVEL = "info"
 
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
         super().__init__()
 
-        self._last_log_msg = None
+        self._last_log_msgs: list = [0, "", ""]
         self.setupUi(self)
         self.blossom_one_type.currentTextChanged.connect(lambda: self.on_blossom_type_changed("one"))
         self.blossom_two_type.currentTextChanged.connect(lambda: self.on_blossom_type_changed("two"))
@@ -75,7 +76,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.logger = Logger(f"{self.output_directory}/{self.study_id}/system_log.json", mode="system")
 
-        self.capture_thread = FrameCaptureThread(logger=self.logger)
+        self.capture_thread = FrameCaptureThread(logger=self.logger, device=self.cam_device)
         self.capture_thread.start()
 
         self.log_timer = QTimer()
@@ -153,7 +154,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         sender = getattr(self, f"blossom_{number}_sender", None)
         if sender:
             sender.mode = new_type
-        self.logger(f"[Main] Blossom {number} type set to '{new_type}'.", level="debug")
+        self.logger(f"[Main] Blossom {number} type set to '{new_type}'.", level="info")
         sender = getattr(self, f"blossom_{number}_sender", None)
         if new_type == "mimetic":
             self.mimetic.update_sender(number, sender)
@@ -209,6 +210,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         changed_blossom_one_endpoint = changed_host or changed_blossom_one_port
         changed_blossom_two_endpoint = changed_host or changed_blossom_two_port
         changed_music_directory = (old.music_directory != new.music_directory)
+        changed_cam_device = (old.cam_device != new.cam_device)
 
         if changed_thresholds:
             try:
@@ -227,13 +229,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
 
         if changed_music_directory:
-            self.mimetic.music_directory = new.music_directory
+            self.dancer.music_directory = new.music_directory
 
         if changed_study_id:
             self.study_id = new.study_id
             self.terminal_output.clear()
             self._log_pos = 0
-            self._last_log_msg = None
+            self._last_log_msgs = None
             self.logger = Logger(output_path=f"{self.output_directory}/{self.study_id}/system_log.json", mode="system", level=LOG_LEVEL)
             self.capture_thread.logger = self.logger
 
@@ -278,12 +280,26 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.mirror_video = new.mirror_video
             self.logger(f"[Main] Changed to new mirror_video setting: {new.mirror_video}", level="info")
 
+        if changed_cam_device:
+            self.capture_thread.stop()
+            self.capture_thread.join()
+            self.cam_device = new.cam_device
+            self.capture_thread = FrameCaptureThread(logger=self.logger, device=self.cam_device)
+            self.capture_thread.start()
+            self.mimetic.frame_capture_thread = self.capture_thread
+            if not self.capture_thread.cap.isOpened():
+                self.logger(f"[Main] Cam {self.cam_device} is offline", level="warning")
+                self.cam_feed.setText("Cam Off")
+            self.timer.timeout.connect(self.update_video_frame)  # type: ignore
+
         if (changed_blossom_one_endpoint or changed_blossom_two_endpoint or changed_output_directory or changed_flip_blossoms or
             changed_mirror_video or changed_thresholds or changed_alpha_map or changed_send_threshold or changed_send_rate or
-            changed_study_id or changed_music_directory or changed_multiplier_map or changed_limit_map):
+            changed_study_id or changed_music_directory or changed_multiplier_map or changed_limit_map or changed_cam_device):
             self.logger("[Main] Settings applied.", level="info")
         else:
             self.logger("[Main] No changes to be applied.", level="info")
+
+
 
     def update_video_frame(self):
         frame = self.capture_thread.get_frame(mirror_video=self.mirror_video)
@@ -494,7 +510,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         try:
             proc.stdin.write((command + "\n").encode())
             proc.stdin.flush()
-            self.logger(f"[Main] Sent '{command}' to {number.capitalize()} Blossom server.")
+            self.logger(f"[Main] Sent '{command}' to {number.capitalize()} Blossom server.", level="info")
         except Exception as e:
             self.logger(f"[Main] Failed to send '{command}' to {number.capitalize()}: {e}", level="error")
 
@@ -636,7 +652,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             data = entry.get("data", "")
 
             msg = data if isinstance(data, str) else json.dumps(data, ensure_ascii=False)
-            msg = msg.replace("\n", "<br>")
+            msg = escape(msg).replace("\n", "<br>")
 
             color = {
                 "INFO": "#50fa7b",
@@ -647,9 +663,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             }.get(level, "#ffffff")
 
             html_line = f'<span style="color:{color};">[{timestamp}] [{level}]</span> {msg}'
-            if msg != self._last_log_msg:
+            if msg not in (self._last_log_msgs[1], self._last_log_msgs[2]):
                 self.terminal_output.append(html_line)
-                self._last_log_msg = msg
+                next_idx = 1 if self._last_log_msgs[0] == 2 else 2
+                self._last_log_msgs[next_idx] = msg
+                self._last_log_msgs[0] = next_idx
 
         if at_bottom:
             self.terminal_output.moveCursor(self.terminal_output.textCursor().MoveOperation.End)
