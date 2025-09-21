@@ -4,8 +4,9 @@ analyze_pose_log.py
 
 Load a line-delimited JSON pose log and:
  - summarize numeric fields (mean/std/min/max/count)
- - compute gaze time per label (center/left/right)
- - count gaze switches (center<->left<->right transitions)
+ - compute gaze time for left/right (based on ratio only)
+ - count gaze switches (left <-> right transitions)
+ - compute dancing_time (%) based on body movement
  - print a short report
 """
 import json
@@ -80,65 +81,108 @@ def compute_frame_durations(entries: List[Dict], default_fps: float) -> List[flo
         return durations
 
 
-def find_gaze_label(obj: Any) -> Optional[str]:
-    if isinstance(obj, dict):
-        if "gaze" in obj and isinstance(obj["gaze"], dict):
-            lbl = obj["gaze"].get("label")
-            if isinstance(lbl, str):
-                return lbl.lower().strip()
-        for v in obj.values():
-            res = find_gaze_label(v)
-            if res:
-                return res
-    elif isinstance(obj, list):
-        for item in obj:
-            res = find_gaze_label(item)
-            if res:
-                return res
-    return None
-
-
-def normalize_gaze_label(raw: Optional[str]) -> Optional[str]:
-    if not raw:
+def classify_gaze_time(entry: Dict) -> Optional[str]:
+    try:
+        ratio = entry["data"]["gaze"]["ratio"]
+        return "left" if ratio >= 0.5 else "right"
+    except Exception:
         return None
-    r = raw.lower()
-    if "center" in r or "centre" in r or "middle" in r:
-        return "center"
-    if "left" in r:
-        return "left"
-    if "right" in r:
-        return "right"
-    return None
 
 
-def gaze_analysis(entries: List[Dict], default_fps: float = 30.0):
-    durations = compute_frame_durations(entries, default_fps=default_fps)
+def classify_gaze_switch(entry: Dict, dead_zone: float = 0.0) -> Optional[str]:
+    try:
+        ratio = entry["data"]["gaze"]["ratio"]
+        if ratio >= 0.5 + dead_zone:
+            return "left"
+        elif ratio < 0.5 - dead_zone:
+            return "right"
+        else:
+            return None
+    except Exception:
+        return None
+
+
+def trim_entries(entries: List[Dict], durations: List[float], analysis_time: float = 300.0, warmup: float = 30.0):
+    """Remove first `warmup` seconds and keep only `analysis_time` seconds, rescaling if needed."""
+    total_time = 0.0
+    trimmed_entries, trimmed_durations = [], []
+
+    # Skip warmup period
+    skipped_time = 0.0
+    i = 0
+    while i < len(durations) and skipped_time < warmup:
+        skipped_time += durations[i]
+        i += 1
+
+    # Collect analysis period
+    while i < len(durations) and total_time < analysis_time:
+        trimmed_entries.append(entries[i])
+        trimmed_durations.append(durations[i])
+        total_time += durations[i]
+        i += 1
+
+    # Rescale durations to exactly analysis_time
+    if total_time > 0:
+        scale = analysis_time / total_time
+        trimmed_durations = [d * scale for d in trimmed_durations]
+
+    return trimmed_entries, trimmed_durations
+
+
+def gaze_analysis(entries: List[Dict], durations: List[float], min_stable: int = 1, dead_zone: float = 0.0):
     counter = Counter()
-    frames_labels: List[Optional[str]] = []
+    labels_for_switch: List[Optional[str]] = []
 
     for entry, dur in zip(entries, durations):
-        raw = find_gaze_label(entry)
-        label = normalize_gaze_label(raw)
-        frames_labels.append(label)
-        if label:
-            counter[label] += dur
+        label_time = classify_gaze_time(entry)
+        if label_time:
+            counter[label_time] += dur
 
-    # Percentages
+        label_switch = classify_gaze_switch(entry, dead_zone=dead_zone)
+        labels_for_switch.append(label_switch)
+
     total_time = sum(counter.values())
     percentages = {k: (v / total_time * 100.0) if total_time > 0 else 0.0 for k, v in counter.items()}
 
-    # Switches
     switches = 0
     switch_types = Counter()
     prev = None
-    for lbl in frames_labels:
-        if lbl and prev and lbl != prev:
-            switches += 1
-            switch_types[f"{prev}->{lbl}"] += 1
-        if lbl:
+    stable_count = 0
+
+    for lbl in labels_for_switch:
+        if lbl == prev:
+            stable_count += 1
+        elif lbl is not None:
+            if prev and stable_count >= min_stable:
+                switches += 1
+                switch_types[f"{prev}->{lbl}"] += 1
             prev = lbl
+            stable_count = 1
+        else:
+            stable_count = 0
 
     return dict(counter), percentages, switches, dict(switch_types)
+
+
+def compute_dancing_time(entries: List[Dict], durations: List[float], threshold: float = 5.0) -> float:
+    dancing_seconds = 0.0
+    total_seconds = sum(durations)
+    prev_axis = None
+
+    for entry, dur in zip(entries, durations):
+        try:
+            axis = entry["data"]["axis"]
+            if prev_axis:
+                dpitch = abs(axis["pitch"] - prev_axis["pitch"])
+                droll = abs(axis["roll"] - prev_axis["roll"])
+                dyaw = abs(axis["yaw"] - prev_axis["yaw"])
+                if max(dpitch, droll, dyaw) > threshold:
+                    dancing_seconds += dur
+            prev_axis = axis
+        except Exception:
+            continue
+
+    return (dancing_seconds / total_seconds * 100) if total_seconds > 0 else 0.0
 
 
 def extract_numeric_values(logs: List[Dict]) -> Dict[str, List[float]]:
@@ -177,9 +221,11 @@ def summarize_data(data: Dict[str, List[float]]) -> Dict[str, Dict]:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Analyze pose log (numeric + gaze + switches).")
+    parser = argparse.ArgumentParser(description="Analyze pose log (5min after warmup + gaze + switches + dancing).")
     parser.add_argument("logfile", help="line-delimited JSON logfile")
     parser.add_argument("--default-fps", type=float, default=30.0)
+    parser.add_argument("--min-stable", type=int, default=1)
+    parser.add_argument("--dead-zone", type=float, default=0.0)
     args = parser.parse_args()
 
     entries = load_pose_logs(args.logfile)
@@ -187,7 +233,9 @@ def main():
         print("No entries found.")
         return
 
-    # Numeric
+    durations = compute_frame_durations(entries, default_fps=args.default_fps)
+    entries, durations = trim_entries(entries, durations, analysis_time=300.0, warmup=30.0)
+
     numeric_data = extract_numeric_values(entries)
     summary = summarize_data(numeric_data)
     print("\n📊 Numeric Summary:")
@@ -196,15 +244,19 @@ def main():
         for stat, val in stats.items():
             print(f"  {stat}: {val:.4f}" if isinstance(val, float) else f"  {stat}: {val}")
 
-    # Gaze + Switches
-    counter, percentages, switches, switch_types = gaze_analysis(entries, default_fps=args.default_fps)
+    counter, percentages, switches, switch_types = gaze_analysis(
+        entries, durations, min_stable=args.min_stable, dead_zone=args.dead_zone
+    )
     print("\n👀 Gaze time distribution:")
-    for lbl in ["center", "left", "right"]:
+    for lbl in ["left", "right"]:
         print(f"  {lbl}: {counter.get(lbl, 0.0):.2f}s ({percentages.get(lbl, 0.0):.1f}%)")
 
     print(f"\n🔄 Gaze switches: {switches}")
     for trans, n in switch_types.items():
         print(f"  {trans}: {n}")
+
+    dancing_percent = compute_dancing_time(entries, durations)
+    print(f"\n🕺 Dancing time: {dancing_percent:.2f}% of total session")
 
 
 if __name__ == "__main__":
