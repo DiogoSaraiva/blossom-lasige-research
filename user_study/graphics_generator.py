@@ -3,7 +3,7 @@
 generate_graphs_userstudy.py
 
 Generate exploratory graphs for the user study dataset.
-CSV format expected: ID, time_mimic (right), time_dancer (left), switches, dancing_time(%), notes
+CSV format expected: ID, time_mimic, time_dancer, switches, dancing_time(%), notes
 """
 
 import pandas as pd
@@ -15,23 +15,14 @@ import os
 
 sns.set(style="whitegrid", context="talk", palette="Set2")
 
-TOTAL_TIME = 150.0
 OUTPUT_DIR = "graphs"  
 os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-
-def parse_time_percentage(s):
-    """Convert '221.97s (74.0%)' into float seconds"""
-    match = re.match(r"([\d\.]+)s", str(s))
-    return float(match.group(1)) if match else None
-
 
 def parse_percentage(s):
     """Convert '10.6%' into float"""
     if isinstance(s, str):
         return float(s.strip('%'))
     return s
-
 
 def boxplot_variable(df, var, ylabel, title, filename, color:str):
     outpath = os.path.join(OUTPUT_DIR, filename)
@@ -73,11 +64,11 @@ def stacked_bar(df, filename, color1:str, color2:str):
     outpath = os.path.join(OUTPUT_DIR, filename)
 
     # médias nas duas colunas do CSV
-    agg = df[["time_mimic (right)", "time_dancer (left)"]].mean()
+    agg = df[["time_mimic", "time_dancer"]].mean()
 
     # mantém a mesma construção do DF (nada muda no gráfico)
     agg_df = pd.DataFrame({
-        "mean_time": [agg["time_mimic (right)"], agg["time_dancer (left)"]],
+        "mean_time": [agg["time_mimic"], agg["time_dancer"]],
         "role": ["Mimic", "Dancer"]
     }).set_index("role")
 
@@ -114,16 +105,16 @@ def main(color1:str, color2:str):
     print("Colunas lidas do CSV:", df.columns.tolist())
 
     # Convert columns
-    if "time_mimic (right)" in df.columns:
-        df["time_mimic (right)"] = df["time_mimic (right)"].apply(parse_time_percentage)
-    if "time_dancer (left)" in df.columns:
-        df["time_dancer (left)"] = df["time_dancer (left)"].apply(parse_time_percentage)
+    if "time_mimic" in df.columns:
+        df["time_mimic"] = df["time_mimic"]
+    if "time_dancer" in df.columns:
+        df["time_dancer"] = df["time_dancer"]
     if "dancing_time(%)" in df.columns:
-        df["dancing_time(%)"] = df["dancing_time(%)"].apply(parse_percentage)
+        df["dancing_time(%)"] = df["dancing_time"]
 
     # Boxplots
-    if "time_mimic (right)" in df.columns:
-        boxplot_variable(df, "time_mimic (right)", "Time (s)", "Time looking at Mimic", "box_time_mimic.png", color1)
+    if "time_mimic" in df.columns:
+        boxplot_variable(df, "time_mimic", "Time (s)", "Time looking at Mimic", "box_time_mimic.png", color1)
     if "switches" in df.columns:
         boxplot_variable(df, "switches", "Participants", "Number of gaze switches", "box_switches.png",  color1)
     if "dancing_time(%)" in df.columns:
@@ -141,11 +132,11 @@ def main(color1:str, color2:str):
                                 "Relation between dancing time (%) and gaze switches", "scatter_dancing_switches.png", color1, color2)
 
     # Stacked bar (TOM vs JERRY)
-    if "time_mimic (right)" in df.columns and "time_dancer (left)" in df.columns:
+    if "time_mimic" in df.columns and "time_dancer" in df.columns:
         stacked_bar(df, "stacked_time.png", color1, color2)
 
     print(f"Graphs generated successfully! Check the '{OUTPUT_DIR}/' folder.")
 
 
 if __name__ == "__main__":
-    main(color1="#718EA4", color2="#496D89")
+    main(color1="#C340A2", color2="#A2007B")
