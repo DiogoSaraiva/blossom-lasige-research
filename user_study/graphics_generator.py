@@ -36,6 +36,13 @@ def boxplot_variable(df, var, ylabel, title, filename, color:str):
     plt.savefig(outpath)
     plt.close()
 
+def pie_chart(data, labels, title, filename):
+    outpath = os.path.join(OUTPUT_DIR, filename)
+    plt.pie(data=data, labels=labels, autopct='%1.1f%%')
+    plt.title(title)
+    plt.tight_layout()
+    plt.savefig(outpath)
+    plt.close()
 
 def histogram_variable(df, var, title, filename, color:str):
     outpath = os.path.join(OUTPUT_DIR, filename)
@@ -75,10 +82,8 @@ def stacked_bar(df, filename, color1:str, color2:str):
     ax = agg_df.T.plot(kind="bar", stacked=True, figsize=(7, 5),
                        color=[color1, color2])  # mesmas cores do gráfico
 
-    # --------- trocamos APENAS a ordem da LEGENDA ---------
     handles, labels = ax.get_legend_handles_labels()
     ax.legend(handles[::-1], labels[::-1], title="Robot")
-    # -------------------------------------------------------
 
     plt.title("Average time distribution: Mimic vs Dancer")
     plt.ylabel("Time (s)")
@@ -104,14 +109,6 @@ def main(color1:str, color2:str):
 
     print("Colunas lidas do CSV:", df.columns.tolist())
 
-    # Convert columns
-    if "time_mimic" in df.columns:
-        df["time_mimic"] = df["time_mimic"]
-    if "time_dancer" in df.columns:
-        df["time_dancer"] = df["time_dancer"]
-    if "dancing_time(%)" in df.columns:
-        df["dancing_time(%)"] = df["dancing_time"]
-
     # Boxplots
     if "time_mimic" in df.columns:
         boxplot_variable(df, "time_mimic", "Time (s)", "Time looking at Mimic", "box_time_mimic.png", color1)
@@ -134,6 +131,9 @@ def main(color1:str, color2:str):
     # Stacked bar (TOM vs JERRY)
     if "time_mimic" in df.columns and "time_dancer" in df.columns:
         stacked_bar(df, "stacked_time.png", color1, color2)
+
+    # Pie chart
+
 
     print(f"Graphs generated successfully! Check the '{OUTPUT_DIR}/' folder.")
 
