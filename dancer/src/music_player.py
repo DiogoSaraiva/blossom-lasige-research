@@ -69,6 +69,9 @@ class MusicPlayer:
                 self.logger(f"[MusicPlayer] Empty audio: {Path(path).name}", level="warning")
                 return
 
+            if self._stop_event.is_set():
+                return
+
             sd.default.channels = 1
             self.logger(f"[MusicPlayer] Playing: {Path(path).name}", level="info")
             self.is_running = True

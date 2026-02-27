@@ -30,6 +30,7 @@ class PoseBuffer:
         self.buffer = {}  # face + pose by timestamp
         self.pose_data_buffer = []  # array de (pose_data, timestamp)
         self.lock = Lock()
+        self.last_pose_update_time: float = 0.0
 
     def add(self, kind: str, result: dict, timestamp: int):
         """
@@ -44,11 +45,14 @@ class PoseBuffer:
             ValueError: If kind is not "face" or "pose_data".
         """
         try:
+            if kind not in ["face", "pose_data"]:
+                raise ValueError(f"Invalid kind: {kind}. Must be 'face' or 'pose_data'")
             with self.lock:
                 if kind == "pose_data":
                     self.pose_data_buffer.append((result, timestamp))
                     if len(self.pose_data_buffer) > 30:
                         self.pose_data_buffer = self.pose_data_buffer[-30:]
+                    self.last_pose_update_time = time.time()
                 else:
                     if timestamp not in self.buffer:
                         self.buffer[timestamp] = {}
@@ -59,8 +63,6 @@ class PoseBuffer:
             self.logger(f"[ResultBuffer] TypeError: {e}", level="error")
         except Exception as e:
             self.logger(f"[ResultBuffer] Unexpected error: {e}", level="error")
-        if kind not in ["face", "pose_data"]:
-            raise ValueError(f"Invalid kind: {kind}. Must be 'face' or 'pose_data'")
 
     def get_if_complete(self, timestamp: int):
         """
@@ -105,6 +107,11 @@ class PoseBuffer:
                     del self.buffer[ts]
                     return res["face"], res["pose"]
         return None, None
+
+    def is_pose_fresh(self, max_age: float = 0.2) -> bool:
+        """Returns True if pose data was updated within the last max_age seconds."""
+        with self.lock:
+            return self.last_pose_update_time > 0 and (time.time() - self.last_pose_update_time) < max_age
 
     def get_latest_pose_data(self):
         """

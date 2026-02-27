@@ -12,11 +12,11 @@ class MimeticRunnerThread(QThread):
 
     def run(self):
         while self.is_running:
-            if self.mimetic.data is not None:
-                data = self.mimetic.data
-            else:
-                data = {}
-            self.data_updated.emit(data)  # type: ignore
+            try:
+                data = self.mimetic.data if self.mimetic.data is not None else {}
+                self.data_updated.emit(data)  # type: ignore
+            except Exception:
+                pass
             self.msleep(30)
 
 

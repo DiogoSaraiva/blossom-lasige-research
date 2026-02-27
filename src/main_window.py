@@ -135,7 +135,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             limit_map=self.limit_map,
             send_rate=self.send_rate,
             send_threshold=self.send_threshold,
-            flip_blossom=self.flip_blossoms,
+            flip_blossoms=self.flip_blossoms,
         )
 
 
@@ -158,7 +158,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         sender = getattr(self, f"blossom_{number}_sender", None)
         if new_type == "mimetic":
             self.mimetic.update_sender(number, sender)
-        else :
+        else:
             self.mimetic.update_sender(number, None)
 
     def get_blossom_type(self, number: Literal["one", "two"]) -> Literal["mimetic", "dancer"]:
@@ -225,7 +225,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.mimetic.limiter.send_threshold = new.send_threshold
             self.mimetic.limiter.multiplier_map = new.multiplier_map
             self.mimetic.limiter.limit_map = new.limit_map
-            self.logger(f"[Main] Updated for new mimetic motion limiter values.", level="info")
+            self.logger("[Main] Updated for new mimetic motion limiter values.", level="info")
 
 
         if changed_music_directory:
@@ -235,7 +235,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.study_id = new.study_id
             self.terminal_output.clear()
             self._log_pos = 0
-            self._last_log_msgs = None
+            self._last_log_msgs = [0, "", ""]
             self.logger = Logger(output_path=f"{self.output_directory}/{self.study_id}/system_log.json", mode="system", level=LOG_LEVEL)
             self.capture_thread.logger = self.logger
 
@@ -290,7 +290,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             if not self.capture_thread.cap.isOpened():
                 self.logger(f"[Main] Cam {self.cam_device} is offline", level="warning")
                 self.cam_feed.setText("Cam Off")
-            self.timer.timeout.connect(self.update_video_frame)  # type: ignore
 
         if (changed_blossom_one_endpoint or changed_blossom_two_endpoint or changed_output_directory or changed_flip_blossoms or
             changed_mirror_video or changed_thresholds or changed_alpha_map or changed_send_threshold or changed_send_rate or
@@ -319,10 +318,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.cam_feed.setPixmap(scaled_pixmap)
 
     def closeEvent(self, event):
-        if self.blossom_one_sender:
-            self.toggle_blossom(action="reset", number="one")
-        if self.blossom_two_sender:
-            self.toggle_blossom(action="reset", number="two")
+        self.timer.stop()
+        self.log_timer.stop()
+        if self.blossom_one_active:
+            self.send_blossom_command("one", "reset")
+            self.toggle_blossom(action="stop", number="one")
+        if self.blossom_two_active:
+            self.send_blossom_command("two", "reset")
+            self.toggle_blossom(action="stop", number="two")
         if self.capture_thread:
             self.capture_thread.stop()
             self.capture_thread.join()
@@ -333,7 +336,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.mimetic_thread.wait()
         if self.dancer and self.dancer.is_running:
             self.dancer.stop()
-
         if self.recorder_thread and self.recorder_thread.is_running:
             self.recorder_thread.stop()
             self.recorder_thread.join()
@@ -398,7 +400,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             "right": self.right_indicator
         }
 
-        def update_gaze_indicator(label: str = None):
+        def update_gaze_indicator(label: Optional[str] = None):
 
             clear_gaze_indicator()
 
@@ -417,16 +419,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         gaze = data.get('gaze')
 
         if gaze and self.mimetic.is_running:
-
             gaze_label = gaze.get("label", None)
-
-            gaze_ratio = gaze.get("ratio", None)
-
+            gaze_ratio = gaze.get("ratio")
             if gaze_label != self._last_gaze_label:
                 update_gaze_indicator(gaze_label)
+            if gaze_ratio is not None:
+                self.gaze_left_bar.setValue(max(0, int((0.5 - gaze_ratio) * 200)))
+                self.gaze_right_bar.setValue(max(0, int((gaze_ratio - 0.5) * 200)))
         else:
             clear_gaze_indicator()
             self._last_gaze_label = None
+            self.gaze_left_bar.setValue(0)
+            self.gaze_right_bar.setValue(0)
 
         axis = data.get("axis")
         if axis is not None:
@@ -494,6 +498,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             else:
                 if hasattr(self, attr) and getattr(self, attr).init_allowed:
                     self.logger(f"[Main] Failed to start {mode.capitalize()} Blossom server.", level="error")
+                setattr(self, f"blossom_{number}_active", False)
+                getattr(self, f"blossom_{number}_button").setText("Start")
+                getattr(self, f"blossom_{number}_type").setEnabled(True)
 
         launcher.finished.connect(on_ready)
         launcher.start()
@@ -514,7 +521,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             self.logger(f"[Main] Failed to send '{command}' to {number.capitalize()}: {e}", level="error")
 
-    def toggle_blossom(self, number: Literal["one", "two"], action: Literal["start", "stop", "reset"] = None):
+    def toggle_blossom(self, number: Literal["one", "two"], action: Optional[Literal["start", "stop", "reset"]] = None):
         # Attribute names
         active_attr = f"blossom_{number}_active"
         type_name = self.get_blossom_type(number)
@@ -540,15 +547,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 if launcher and launcher.isRunning():
                     launcher.init_allowed = False
                     self.logger(f"[Main] Canceled Blossom {number.capitalize()} server initialization....", level="info")
+                    launcher.wait(1500)
                 if getattr(launcher, "success") and controller:
-                    sender =  getattr(self, sender_attr)
-                    if getattr(controller, f"is_sending_{number}"):
-                        controller.stop_sending(blossom_sender=sender, number=number)
-                        self.logger(f"[Main] {type_name.capitalize()} sending stopped.", level="info")
-                    self.send_blossom_command(number, "q")
-
-                    sender.stop()
-                    sender.join()
+                    sender = getattr(self, sender_attr)
+                    if sender is None:
+                        self.logger(f"[Main] Blossom {number.capitalize()} sender not yet initialized, skipping cleanup.", level="warning")
+                    else:
+                        if getattr(controller, f"is_sending_{number}"):
+                            controller.stop_sending(blossom_sender=sender, number=number)
+                            self.logger(f"[Main] {type_name.capitalize()} sending stopped.", level="info")
+                        self.send_blossom_command(number, "q")
+                        sender.stop()
+                        sender.join()
 
             self.logger(f"[Main] Blossom {number.capitalize()} server stopped...", level="info")
             setattr(self, sender_attr, None)
@@ -597,6 +607,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             if self.recorder_thread.wait_until_ready(timeout=2):
                 self.recording_button.setText("Stop Rec.")
                 self.recording_button.setEnabled(True)
+            else:
+                self.logger("Recording failed to start.", level="error")
+                self.recorder_thread = None
+                self.recording_button.setEnabled(True)
 
         def stop_recording():
             if not self.recorder_thread or not self.recorder_thread.is_running:
@@ -639,7 +653,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             return
 
         scrollbar = self.terminal_output.verticalScrollBar()
-        at_bottom = scrollbar.value() == scrollbar.maximum()
+        at_bottom = scrollbar is not None and scrollbar.value() == scrollbar.maximum()
 
         for line in lines:
             try:

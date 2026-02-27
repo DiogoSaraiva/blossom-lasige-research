@@ -1,4 +1,5 @@
 import threading
+import traceback
 # noinspection PyPackageRequirements
 import cv2
 
@@ -61,11 +62,11 @@ class FrameCaptureThread(threading.Thread):
                 if ret:
                     with self.lock:
                         self.latest_frame = frame
-            self.cap.release()
         except Exception as e:
             self.logger(f"[FrameCaptureThread] CRASHED: {e}", level="critical")
-            import traceback
             traceback.print_exc()
+        finally:
+            self.cap.release()
 
     def get_frame(self, width: int=None, height: int=None, mirror_video: bool=False):
         """
@@ -91,9 +92,7 @@ class FrameCaptureThread(threading.Thread):
 
     def stop(self):
         """
-        Stops the frame capture thread and releases the camera resource.
+        Stops the frame capture thread. Camera release is handled by the run() finally block.
         """
         self.is_running = False
-        if self.cap.isOpened():
-            self.cap.release()
         self.logger("[FrameCaptureThread] Thread stopped", level="info")

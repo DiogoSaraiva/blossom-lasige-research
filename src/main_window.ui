@@ -600,13 +600,13 @@ QCheckBox::indicator:unchecked {
       <property name="minimumSize">
        <size>
         <width>170</width>
-        <height>80</height>
+        <height>110</height>
        </size>
       </property>
       <property name="maximumSize">
        <size>
         <width>170</width>
-        <height>80</height>
+        <height>110</height>
        </size>
       </property>
       <property name="title">
@@ -838,6 +838,49 @@ QCheckBox::indicator:unchecked {
        </property>
        <property name="alignment">
         <set>Qt::AlignCenter</set>
+       </property>
+      </widget>
+      <widget class="QProgressBar" name="gaze_left_bar">
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>82</y>
+         <width>65</width>
+         <height>14</height>
+        </rect>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">QProgressBar { border: 1px solid #444; border-radius: 3px; background: rgb(192,191,188); }
+QProgressBar::chunk { background-color: red; border-radius: 2px; }</string>
+       </property>
+       <property name="value">
+        <number>0</number>
+       </property>
+       <property name="textVisible">
+        <bool>false</bool>
+       </property>
+       <property name="invertedAppearance">
+        <bool>true</bool>
+       </property>
+      </widget>
+      <widget class="QProgressBar" name="gaze_right_bar">
+       <property name="geometry">
+        <rect>
+         <x>95</x>
+         <y>82</y>
+         <width>65</width>
+         <height>14</height>
+        </rect>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">QProgressBar { border: 1px solid #444; border-radius: 3px; background: rgb(192,191,188); }
+QProgressBar::chunk { background-color: red; border-radius: 2px; }</string>
+       </property>
+       <property name="value">
+        <number>0</number>
+       </property>
+       <property name="textVisible">
+        <bool>false</bool>
        </property>
       </widget>
      </widget>

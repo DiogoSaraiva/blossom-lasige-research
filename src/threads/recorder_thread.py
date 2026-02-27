@@ -1,5 +1,6 @@
 import threading
 import time
+import traceback
 from src.ffmpeg_recorder import FFmpegRecorder
 from src.logging_utils import Logger
 from src.threads.frame_capture import FrameCaptureThread
@@ -7,7 +8,7 @@ from src.threads.frame_capture import FrameCaptureThread
 
 class RecorderThread(threading.Thread):
     def __init__(self, output_path: str, capture_thread: FrameCaptureThread, logger: Logger,
-                 resolution: (int, int) = (1280, 720), fps: int = 30, mirror: bool = True):
+                 resolution: tuple[int, int] = (1280, 720), fps: int = 30, mirror: bool = True):
         super().__init__()
         self.logger = logger
         self.capture_thread = capture_thread
@@ -31,7 +32,6 @@ class RecorderThread(threading.Thread):
             self.ready.set()
 
         except Exception as e:
-            import traceback
             self.logger(f"[Recorder] CRASHED: {e}\n{traceback.format_exc()}", level="critical")
             self.is_running = False
             return
@@ -59,10 +59,10 @@ class RecorderThread(threading.Thread):
                 next_frame_time += interval
 
         except Exception as e:
-            import traceback
             self.logger(f"[Recorder] CRASHED: {e}\n{traceback.format_exc()}", level="critical")
 
         finally:
+            self.recorder.stop_recording()
             self.stop()
             self.logger("[Recorder] Thread stopped", level="info")
             self.logger(f"[Recorder] Recordings saved to {self.recorder.output_path}", level="info")

@@ -6,8 +6,6 @@ import numpy as np
 import sounddevice as sd
 
 from src.logging_utils import Logger
-from joblib.externals import loky  # noqa
-from librosa import beat, onset  # noqa
 from dancer.src.dance_sequences import dance_sequence_from_data
 
 class BeatDetector:

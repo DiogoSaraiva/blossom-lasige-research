@@ -1,5 +1,6 @@
 import os
 import threading
+import traceback
 from queue import Queue, Empty
 
 import cv2
@@ -65,6 +66,7 @@ class MediaPipeThread(threading.Thread):
         self.is_running = True
         self.latest_face = None
         self.latest_pose = None
+        self._landmark_lock = threading.Lock()
         self.last_timestamp = 0
         self.face_valid_until = 0
         self.pose_valid_until = 0
@@ -90,24 +92,33 @@ class MediaPipeThread(threading.Thread):
             raise RuntimeError("Failed to initialize MediaPipe models") from e
 
     def update_thresholds(self, left_threshold: float, right_threshold: float):
-        self.gaze_estimator = GazeEstimator(left_threshold=left_threshold, right_threshold=right_threshold)
+        self.gaze_estimator = GazeEstimator(left_threshold=left_threshold, right_threshold=right_threshold, mirror=self.gaze_estimator.mirror)
 
 
     def _init_landmarkers(self, face_model, pose_model):
-        base_delegate = BaseOptions.Delegate.GPU
-        face_options = FaceLandmarkerOptions(
-            base_options=BaseOptions(model_asset_path=face_model, delegate=base_delegate),
-            running_mode=vision.RunningMode.LIVE_STREAM,
-            result_callback=self.face_callback,
-            output_facial_transformation_matrixes=True
-        )
-        self.face_landmarker = vision.FaceLandmarker.create_from_options(face_options)
-        pose_options = PoseLandmarkerOptions(
-            base_options=BaseOptions(model_asset_path=pose_model, delegate=base_delegate),
-            running_mode=vision.RunningMode.LIVE_STREAM,
-            result_callback=self.pose_callback
-        )
-        self.pose_landmarker = vision.PoseLandmarker.create_from_options(pose_options)
+        for delegate in [BaseOptions.Delegate.GPU, BaseOptions.Delegate.CPU]:
+            try:
+                face_options = FaceLandmarkerOptions(
+                    base_options=BaseOptions(model_asset_path=face_model, delegate=delegate),
+                    running_mode=vision.RunningMode.LIVE_STREAM,
+                    result_callback=self.face_callback,
+                    output_facial_transformation_matrixes=True
+                )
+                self.face_landmarker = vision.FaceLandmarker.create_from_options(face_options)
+                pose_options = PoseLandmarkerOptions(
+                    base_options=BaseOptions(model_asset_path=pose_model, delegate=delegate),
+                    running_mode=vision.RunningMode.LIVE_STREAM,
+                    result_callback=self.pose_callback
+                )
+                self.pose_landmarker = vision.PoseLandmarker.create_from_options(pose_options)
+                label = "GPU" if delegate == BaseOptions.Delegate.GPU else "CPU"
+                self.logger(f"[MediaPipe] Using {label} delegate.", level="info")
+                return
+            except Exception as e:
+                if delegate == BaseOptions.Delegate.GPU:
+                    self.logger(f"[MediaPipe] GPU initialization failed: {e}. Retrying with CPU...", level="warning")
+                else:
+                    raise
 
     def run(self):
         """
@@ -134,7 +145,6 @@ class MediaPipeThread(threading.Thread):
                 except Exception as e:
                     self.logger(f"[MediaPipe] Frame processing error: {e}", level="debug")
         except Exception as e:
-            import traceback
             self.logger(f"[MediaPipe] CRASHED: {e} \n {traceback.format_exc()}", level="critical")
 
     @staticmethod
@@ -143,7 +153,7 @@ class MediaPipeThread(threading.Thread):
 
     def _process_frame(self, frame, timestamp):
         if not isinstance(frame, np.ndarray):
-            self.logger("[MediaPipe] Invalid frame", level="Warning")
+            self.logger("[MediaPipe] Invalid frame", level="warning")
             return
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame)
         self.face_landmarker.detect_async(mp_image, timestamp)
@@ -169,7 +179,6 @@ class MediaPipeThread(threading.Thread):
             self.queue.put_nowait((frame, timestamp))
         except Exception as e:
             self.logger(f"[MediaPipe] Error sending frame: {e}", level="error")
-            import traceback
             traceback.print_exc()
 
     # noinspection PyUnusedLocal
@@ -189,12 +198,12 @@ class MediaPipeThread(threading.Thread):
             # self.logger("[MediaPipe] No face landmarks detected", level="debug")
             return
         try:
-            self.latest_face = result
-            self.face_valid_until = timestamp_ms + self.landmark_timeout_ms
+            with self._landmark_lock:
+                self.latest_face = result
+                self.face_valid_until = timestamp_ms + self.landmark_timeout_ms
             self.try_process(timestamp_ms)
         except Exception as e:
             self.logger(f"[MediaPipe] Error processing face data: {e}", level="error")
-            import traceback
             traceback.print_exc()
 
     # noinspection PyUnusedLocal
@@ -214,12 +223,12 @@ class MediaPipeThread(threading.Thread):
             self.logger("[MediaPipe] No pose landmarks detected", level="debug")
             return
         try:
-            self.latest_pose = result
-            self.pose_valid_until = timestamp_ms + self.landmark_timeout_ms
+            with self._landmark_lock:
+                self.latest_pose = result
+                self.pose_valid_until = timestamp_ms + self.landmark_timeout_ms
             self.try_process(timestamp_ms)
         except Exception as e:
             self.logger(f"[MediaPipe] Error processing pose data: {e}", level="error")
-            import traceback
             traceback.print_exc()
 
     def try_process(self, timestamp_ms: int):
@@ -232,15 +241,18 @@ class MediaPipeThread(threading.Thread):
         Args:
             timestamp_ms (int): The timestamp of the frame in milliseconds.
         """
-        face_valid = self.latest_face is not None and timestamp_ms <= self.face_valid_until
-        pose_valid = self.latest_pose is not None and timestamp_ms <= self.pose_valid_until
-        if not face_valid or not pose_valid:
-            return
+        with self._landmark_lock:
+            face_valid = self.latest_face is not None and timestamp_ms <= self.face_valid_until
+            pose_valid = self.latest_pose is not None and timestamp_ms <= self.pose_valid_until
+            if not face_valid or not pose_valid:
+                return
+            latest_face = self.latest_face
+            latest_pose = self.latest_pose
         try:
-            face_landmarks = self.latest_face.face_landmarks[0]
-            pose_landmarks = self.latest_pose.pose_landmarks[0]
+            face_landmarks = latest_face.face_landmarks[0]
+            pose_landmarks = latest_pose.pose_landmarks[0]
 
-            matrix = self.latest_face.facial_transformation_matrixes[0].data
+            matrix = latest_face.facial_transformation_matrixes[0].data
             matrix_np = np.array(matrix, dtype=np.float32).reshape(4, 4)
             pitch, roll, yaw = self.extract_data_from_matrix(data=matrix_np)
 
@@ -259,7 +271,6 @@ class MediaPipeThread(threading.Thread):
             self.result_buffer.add("pose_data", pose_data, timestamp_ms)
         except Exception as e:
             self.logger(f"[MediaPipe] Error processing pose data: {e}", level="error")
-            import traceback
             traceback.print_exc()
 
     @staticmethod

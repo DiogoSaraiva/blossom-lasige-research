@@ -1,5 +1,6 @@
 import threading
 import time
+import traceback
 from queue import Queue, Empty, Full
 from typing import Literal
 
@@ -72,10 +73,9 @@ class BlossomSenderThread(threading.Thread):
                     self.logger(f"[BlossomSender] Error sending: {e}", level="error")
 
         except Exception as e:
-            import traceback
             self.logger(f"[BlossomSender] CRASHED: {e} \n {traceback.format_exc()}", level="critical")
         finally:
-            self.logger(f"[BlossomSender] Closing thread", level="info")
+            self.logger("[BlossomSender] Closing thread", level="info")
             self.stop()
 
     def _cooperative_sleep(self, seconds: float, step: float = 0.02):

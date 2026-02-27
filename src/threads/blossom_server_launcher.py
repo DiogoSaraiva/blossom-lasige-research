@@ -46,8 +46,7 @@ class BlossomServerLauncher(QThread):
             if mode == "port":
                 result = subprocess.run(["lsof", "-t", f"-i:{self.port}"], capture_output=True, text=True, check=False)
             else:
-                result = subprocess.run(["lsof", "-t", f"-i:{self.usb}"], capture_output=True, text=True, check=False
-                                        )
+                result = subprocess.run(["lsof", "-t", self.usb], capture_output=True, text=True, check=False)
             pids = [p.strip() for p in result.stdout.splitlines() if p.strip()]
 
             if not pids:
@@ -84,8 +83,12 @@ class BlossomServerLauncher(QThread):
                 if self.server_proc: self.server_proc.terminate()
                 return
             if not self.init_allowed:
+                if self.server_proc:
+                    self.server_proc.terminate()
                 return
             self.success = True
             self.logger(f"[BlossomLauncher] Blossom server ({self.number.upper()}) started successfully at {self.url}.")
         except Exception as e:
             self.logger(f"[BlossomLauncher] Exception while starting Blossom server at {self.url}: {e}", level="error")
+            if self.server_proc:
+                self.server_proc.terminate()

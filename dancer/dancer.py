@@ -96,7 +96,12 @@ class Dancer:
                     self._cooperative_sleep(0.5)
                     continue
 
-            mood = self._run()
+            try:
+                mood = self._run()
+            except Exception as e:
+                self.logger(f"[Dancer] Error in run loop: {e}", level="error")
+                self._cooperative_sleep(self.resting_period)
+                continue
             if not mood:
                 self._cooperative_sleep(self.resting_period)
                 continue
@@ -143,9 +148,9 @@ class Dancer:
     def stop(self):
         """Stop the Dancer, halt music playback, and join the thread if alive."""
         self.logger("[Dancer] Stopping...", level="info")
-        self.music_player.stop()
         self.current_sequence = None
         self._stop_event.set()
+        self.music_player.stop()
         if self._thread is not None and self._thread.is_alive():
             self._thread.join(timeout=2.0)
         self.is_running = False

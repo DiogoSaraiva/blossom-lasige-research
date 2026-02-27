@@ -1,5 +1,6 @@
 import threading
 import time
+import traceback
 from typing import Tuple, Literal
 
 import numpy as np
@@ -15,10 +16,10 @@ from src.utils import compact_timestamp
 
 class Mimetic:
     def __init__(self, output_directory: str, study_id: str | int, mirror_video: bool,
-                 capture_thread: FrameCaptureThread, logger: dict[str, Logger], alpha_map: dict[str, float],
+                 capture_thread: FrameCaptureThread, logger: dict[str, Logger | None], alpha_map: dict[str, float],
                  multiplier_map: dict[str, float], limit_map: dict[str, dict[str, float]],
                  send_rate: int, send_threshold: float,
-                 left_threshold: float = 0.45, right_threshold: float = 0.55, flip_blossom: bool = False,):
+                 left_threshold: float = 0.45, right_threshold: float = 0.55, flip_blossoms: bool = False,):
         """
                 Initialize the Mimetic class.
 
@@ -34,9 +35,9 @@ class Mimetic:
                 :param send_threshold: Minimum threshold for sending data
                 :param left_threshold: Left-side threshold for MediaPipe detection
                 :param right_threshold: Right-side threshold for MediaPipe detection
-                :param flip_blossom: Whether to mirror data when sending to Blossom
+                :param flip_blossoms: Whether to mirror data when sending to Blossom
         """
-        self.flip_blossom = flip_blossom
+        self.flip_blossoms = flip_blossoms
         self._stop_event = threading.Event()
         self._thread = None
         self.output_directory = output_directory or "./output"
@@ -93,7 +94,11 @@ class Mimetic:
                     continue
                 self.mp_thread.send(frame_mp)
 
-                # Read results from buffer
+                # Read results from buffer — skip if pose data is stale (detection lost)
+                if not self.pose_buffer.is_pose_fresh():
+                    time.sleep(0.01)
+                    continue
+
                 pose_data, _ = self.pose_buffer.get_latest_pose_data()
 
                 if pose_data is None:
@@ -101,8 +106,7 @@ class Mimetic:
                     time.sleep(0.01)
                     continue
 
-                if pose_data is not None:
-                    last_pose_data = pose_data
+                last_pose_data = pose_data
 
                 if last_pose_data is None:
                     continue  # wait until the first pose is available
@@ -147,7 +151,7 @@ class Mimetic:
                     "ay": 0,
                     "az": -1,
                     "duration_ms": int(duration * 1000) if duration else 500,
-                    "mirror": self.flip_blossom,
+                    "mirror": self.flip_blossoms,
                 }
                 self.data = {
                     "data_sent": False,
@@ -182,7 +186,6 @@ class Mimetic:
                     time.sleep(sleep_time)
 
         except Exception as e:
-            import traceback
             self.logger(f"[Mimetic] Exception in main loop: {e} \n {traceback.format_exc()}", level="critical")
 
         finally:

@@ -149,25 +149,62 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
     def _current_combo_value(combo: QComboBox) -> str:
         if combo is None:
             return ""
-        txt = combo.currentText().strip()
-        return "" if txt.startswith("(") and "ttyACM" in txt else txt
+        txt = combo.currentText().strip().removesuffix(" (current)")
+        return "" if txt.startswith("(") else txt
 
 
     def populate_devices_combos(self, current_one: str = "", current_two: str = "", current_cam: str = ""):
         import re
         import glob
+        import struct
+        import fcntl
         from serial.tools import list_ports
 
         def key(dev: str) -> int:
             m = re.search(r'(\d+)$', dev)
             return int(m.group(1)) if m else 9999
 
+        def _list_capture_devices(current: str = "") -> list[str]:
+            """Return one /dev/videoX per physical camera.
+            Filters by V4L2_CAP_VIDEO_CAPTURE and deduplicates by bus_info.
+            The currently configured device skips the cv2 read test (may already be in use)."""
+            import cv2
+            V4L2_CAP_VIDEO_CAPTURE = 0x00000001
+            VIDIOC_QUERYCAP = 0x80685600
+            seen_buses: set[str] = set()
+            result = []
+            for path in sorted(glob.glob("/dev/video*"), key=key):
+                try:
+                    with open(path, 'rb') as f:
+                        buf = bytearray(104)
+                        fcntl.ioctl(f, VIDIOC_QUERYCAP, buf)
+                        caps = struct.unpack_from('<I', buf, 84)[0]
+                        if not (caps & V4L2_CAP_VIDEO_CAPTURE):
+                            continue
+                        bus_info = buf[48:80].rstrip(b'\x00').decode('ascii', errors='replace')
+                except Exception:
+                    continue
+                if bus_info in seen_buses:
+                    continue
+                if path == current:
+                    # Already in use by the app — trust V4L2 caps, skip cv2 test
+                    seen_buses.add(bus_info)
+                    result.append(path)
+                    continue
+                cap = cv2.VideoCapture(path)
+                can_read = cap.isOpened() and cap.read()[0]
+                cap.release()
+                if can_read:
+                    seen_buses.add(bus_info)
+                    result.append(path)
+            return result
+
         def list_dev(mode: Literal["acm", "cam"]) -> list[str]:
             if mode == "acm":
                 devs = [p.device for p in list_ports.comports() if getattr(p, "device", "").startswith("/dev/ttyACM")]
             else:  # "cam"
-                devs = [d for d in glob.glob("/dev/video*")]
-            return sorted(devs, key=key)
+                devs = _list_capture_devices(current=current_cam)
+            return devs
 
         def fill(mode: Literal["acm", "cam"], combo: QComboBox, cur: str):
             combo.blockSignals(True)
@@ -180,12 +217,8 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
             else:
                 combo.addItems(items)
                 combo.setEnabled(True)
-                if cur:
-                    if cur in items:
-                        combo.setCurrentText(cur)
-                    else:
-                        combo.insertItem(0, f"{cur} (current)")
-                        combo.setCurrentIndex(0)
+                if cur and cur in items:
+                    combo.setCurrentText(cur)
 
             combo.blockSignals(False)
 
