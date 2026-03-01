@@ -1,60 +1,115 @@
-# LASIGE - Summer of Research
+# LASIGE – Summer of Research
 
-This repo contains my research work regarding the **LASIGE Summer of Research 2025**, based on the **Blossom** platform.
+Research work for the **LASIGE Summer of Research 2025**, built on the **Blossom** social robot platform.
 
-It is being developed with **PyCharm**, in **Python 3.11.13**, and is planned to be deployed with **Docker**.
+---
 
-
-##   Project Structure
+## Project Structure
 
 ```
 blossom-lasige-research/
-├── start.py
-├── README.md
-├── .gitignore
-├── .gitmodules
-├── blossom_public/
-│   ├── src/
-│   │   └── server.py
-│   └── start.py
-├── mimetic/
-│   ├── src/
-│   │   └── motion_limiter.py
-│   └── start.py
-├── dancer
-
+├── start.py                  # Application entry point
+├── requirements.txt          # Runtime dependencies
+├── build_appimage.sh         # AppImage build script
+├── AppRun                    # AppImage entry point
+├── blossom.desktop           # AppImage desktop entry
+├── src/                      # Main application (PyQt6 GUI)
+│   ├── main_window.py
+│   ├── main_window.ui
+│   ├── settings_dialog.py
+│   ├── blossom.png           # Application icon
+│   ├── resources.qrc
+│   ├── resources_rc.py       # Compiled Qt resources (do not edit)
+│   └── threads/
+├── mimetic/                  # MediaPipe pose/face tracking module
+├── dancer/                   # Motion/dance generation module
+├── blossom_public/           # Blossom robot HTTP server (submodule)
+└── .github/workflows/        # CI – builds and publishes AppImage
 ```
 
-## First Steps – Configure Development Environment
+---
 
-If you are a student, you may apply for a free JetBrains Student Pack.  
-Just go to [their page](https://www.jetbrains.com/academy/student-pack/) and redeem it.
+## Development Setup
 
-Install **WSL 2.0 Ubuntu** (tested on Ubuntu 24.04) and, if you haven’t done so already, [configure your SSH keys](https://docs.github.com/en/authentication/connecting-to-github-with-ssh).
+Requires **Linux** (Ubuntu 22.04+ recommended) and **Python 3.11**.
 
-Then, with PyCharm already installed and running, click on **"Clone Repository"**, enter:
+### 1. Clone
+
+```bash
+git clone --recurse-submodules git@github.com:DiogoSaraiva/blossom-lasige-research.git
+cd blossom-lasige-research
 ```
-https://github.com/DiogoSaraiva/blossom-lasige-research.git
+
+### 2. Python environment
+
+Using [pyenv](https://github.com/pyenv/pyenv):
+
+```bash
+pyenv install 3.11.13
+pyenv virtualenv 3.11.13 blossom-py3.11
+pyenv activate blossom-py3.11
+pip install -r requirements.txt
 ```
 
-----------
+### 3. Run in dev mode
+
+```bash
+python3 start.py
+```
+
+---
+
+## Building the AppImage
+
+The AppImage bundles Python 3.11 and all dependencies into a single portable executable.
+
+```bash
+bash build_appimage.sh
+```
+
+Output: `dist/Blossom_LASIGE-x86_64.AppImage`
+
+> Requires `rsync` and `appimagetool` (downloaded automatically on first run).
+
+---
+
+## Releases
+
+Pushing a tag triggers GitHub Actions to build the AppImage and publish it as a GitHub Release:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The release will include `Blossom_LASIGE-x86_64.AppImage` as a downloadable asset.
+
+---
+
+## Regenerating Qt Resources
+
+If `src/blossom.png` is changed, regenerate `src/resources_rc.py`:
+
+```bash
+pip install pyside6  # only needed for the rcc tool
+cd src && pyside6-rcc resources.qrc -o resources_rc.py && sed -i 's/from PySide6/from PyQt6/' resources_rc.py
+```
+
+---
 
 ## SSH Authentication
 
-In order to push, you need to use SSH authentication.  
-To change from HTTPS to SSH, run the following:
+To push using SSH instead of HTTPS:
 
 ```bash
-cd blossom-lasige-research
 git remote set-url origin git@github.com:DiogoSaraiva/blossom-lasige-research.git
 
-cd blossom-lasige-research/open_hmi
-git remote set-url origin git@github.com:DiogoSaraiva/OpenHMI.git
-
-cd blossom-lasige-research/blossom_public
+cd blossom_public
 git remote set-url origin git@github.com:DiogoSaraiva/blossom-public.git
 ```
-##  License
 
-This project inherits the license from the original project [blossom-public](https://github.com/hrc2/blossom-public). 
-Additional work here present may follow additional license.
+---
+
+## License
+
+Inherits the license from [blossom-public](https://github.com/hrc2/blossom-public). Additional work may follow additional licensing.
