@@ -95,7 +95,6 @@ fi
 # ---------------------------------------------------------------------------
 echo "[3/6] Copying source code..."
 cp "$PROJECT_DIR/start.py" "$APPDIR/usr/src/"
-cp "$PROJECT_DIR/blossom.png" "$APPDIR/usr/src/"
 
 for dir in src mimetic blossom_public dancer; do
     rsync -a --delete               \

@@ -6,7 +6,11 @@ import sys
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "blossom.png")
+    appdir = os.environ.get("APPDIR")
+    if appdir:
+        icon_path = os.path.join(appdir, "blossom.png")
+    else:
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "blossom.png")
     icon = QIcon(icon_path) if os.path.exists(icon_path) else QIcon()
     app.setWindowIcon(icon)
     window = MainWindow()
