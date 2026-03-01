@@ -5,6 +5,8 @@ import sys
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    app.setApplicationName("Blossom LASIGE Research")
+    app.setDesktopFileName("blossom-lasige-research")
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
