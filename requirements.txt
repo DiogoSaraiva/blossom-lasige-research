@@ -20,8 +20,8 @@ ikpy==3.0.1
 ############################
 # MediaPipe + OpenCV
 ############################
-mediapipe~=0.10.14
-# opencv-contrib-python==4.8.0.74
+mediapipe==0.10.21
+opencv-contrib-python==4.8.0.74
 
 ############################
 # Science / NumPy Stack
@@ -30,10 +30,10 @@ numpy==1.26.4
 scipy==1.13.0
 sympy==1.14.0
 mpmath==1.3.0
-matplotlib~=3.10.3
-pandas
-seaborn
-fpdf
+matplotlib==3.10.5
+pandas==2.3.2
+seaborn==0.13.2
+fpdf==1.7.2
 
 ############################
 # Utilities
@@ -48,13 +48,15 @@ certifi==2025.7.9
 typing_extensions==4.14.1
 prettytable==3.16.0
 packaging==25.0
-configargparse
+ConfigArgParse==1.7.1
 
-
-PyQt6~=6.9.1
+############################
+# PyQt6
+############################
+PyQt6==6.9.1
 
 ############################
 # Audio
 ############################
-librosa
-sounddevice
+librosa==0.11.0
+sounddevice==0.5.2
