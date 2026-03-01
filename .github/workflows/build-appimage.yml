@@ -46,5 +46,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/Blossom_LASIGE-x86_64.AppImage
+          files: |
+            dist/Blossom_LASIGE-x86_64.AppImage
+            blossom.png
           generate_release_notes: true
