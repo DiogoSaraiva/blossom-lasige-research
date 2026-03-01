@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Blossom LASIGE Research
+Exec=start
+Icon=blossom
+Categories=Science;Education;
+Comment=Blossom LASIGE Research Application
+Terminal=false

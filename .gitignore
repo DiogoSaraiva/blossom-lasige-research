@@ -372,3 +372,7 @@ $RECYCLE.BIN/
 *output/*
 *graphs/*
 .csv
+
+# AppImage build artifacts
+AppDir/
+appimagetool-x86_64.AppImage

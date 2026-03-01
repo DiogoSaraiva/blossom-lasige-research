@@ -1,0 +1,25 @@
+#!/bin/bash
+# AppImage entry point for Blossom LASIGE Research
+
+SELF=$(readlink -f "$0")
+HERE=${SELF%/*}
+export APPDIR="${APPDIR:-$HERE}"
+
+PYVER="3.11"
+PYTHON="$APPDIR/usr/python/bin/python3"
+PYLIB="$APPDIR/usr/python/lib/python${PYVER}/site-packages"
+
+export PYTHONHOME="$APPDIR/usr/python"
+export PYTHONPATH="$APPDIR/usr/src"
+export PATH="$APPDIR/usr/python/bin:$APPDIR/usr/bin:$PATH"
+export LD_LIBRARY_PATH="$APPDIR/usr/python/lib:$APPDIR/usr/lib:${LD_LIBRARY_PATH}"
+
+# PyQt6 plugin paths
+export QT_QPA_PLATFORM_PLUGIN_PATH="$PYLIB/PyQt6/Qt6/plugins/platforms"
+export QT_PLUGIN_PATH="$PYLIB/PyQt6/Qt6/plugins"
+export QT_QPA_FONTDIR="$PYLIB/PyQt6/Qt6/fonts"
+
+# Avoid Qt trying to use system theme engines that won't exist
+export QT_QPA_PLATFORMTHEME=""
+
+exec "$PYTHON" "$APPDIR/usr/src/start.py" "$@"

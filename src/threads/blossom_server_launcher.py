@@ -1,10 +1,35 @@
 import os
 import subprocess
+import sys
 import time
 from typing import Literal
 
 import requests
 from PyQt6.QtCore import QThread
+
+
+def _blossom_command(host: str, port: int, usb: str) -> list[str]:
+    """Build the command to launch the blossom server subprocess.
+
+    Inside an AppImage:  $APPDIR is set by the runtime; we use the
+    bundled Python and the bundled blossom_public/start.py.
+
+    In development:  use sys.executable (the current interpreter) and
+    the script relative to the project root.
+    """
+    appdir = os.environ.get("APPDIR")
+    if appdir:
+        python = os.path.join(appdir, "usr", "python", "bin", "python3")
+        script = os.path.join(appdir, "usr", "src", "blossom_public", "start.py")
+    else:
+        python = sys.executable
+        project_root = os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        )
+        script = os.path.join(project_root, "blossom_public", "start.py")
+
+    return [python, script, "--host", host, "--port", str(port), "--browser-disable", "--usb-port", usb]
+
 
 class BlossomServerLauncher(QThread):
     def __init__(self, logger, host, port: int, number: Literal["one", "two"], usb: str):
@@ -69,14 +94,10 @@ class BlossomServerLauncher(QThread):
             self.logger(f"[BlossomLauncher]  Launching blossom_public/start.py ({self.number.upper()} at {self.url})...", level="info")
             self.kill_if_using(mode="port")
             self.kill_if_using(mode="device")
-            self.server_proc = subprocess.Popen([
-                "python", "blossom_public/start.py",
-                "--host", self.host,
-                "--port", str(self.port),
-                "--browser-disable",
-                "--usb-port", self.usb
-
-            ], stdin=subprocess.PIPE)
+            self.server_proc = subprocess.Popen(
+                _blossom_command(self.host, self.port, self.usb),
+                stdin=subprocess.PIPE,
+            )
 
             if not self.wait_for_server_ready() and self.init_allowed:
                 self.logger(f"[BlossomLauncher] Blossom server ({self.number.upper()}) failed to start at {self.url}.", level="error")

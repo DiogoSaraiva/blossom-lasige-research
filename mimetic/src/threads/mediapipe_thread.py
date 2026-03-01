@@ -14,6 +14,7 @@ from mediapipe.tasks.python.vision import (
 
 from mimetic.src.pose_buffer import PoseBuffer
 from src.logging_utils import Logger
+from src.utils import resource_path
 
 from mimetic.src.gaze_utils import GazeEstimator
 
@@ -75,9 +76,9 @@ class MediaPipeThread(threading.Thread):
         self.gaze_estimator = GazeEstimator(left_threshold=left_threshold, right_threshold=right_threshold, mirror=mirror_video)
 
         if model_dir is None:
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            model_dir = os.path.join(current_dir, "..", "..", "models")
-        model_dir = os.path.abspath(model_dir)
+            model_dir = resource_path(os.path.join("mimetic", "models"))
+        else:
+            model_dir = os.path.abspath(model_dir)
 
         face_model = os.path.join(model_dir, "face_landmarker.task")
         pose_model = os.path.join(model_dir, "pose_landmarker_full.task")

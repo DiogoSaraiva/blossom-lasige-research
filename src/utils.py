@@ -1,6 +1,18 @@
+import os
 from datetime import datetime
 import socket
 from typing import Optional
+
+
+def resource_path(relative_path: str) -> str:
+    """Return the absolute path to a project resource.
+
+    Works in normal dev mode and inside an AppImage (where PYTHONPATH points
+    to $APPDIR/usr/src, so __file__ resolves within the mounted image).
+    """
+    # Project root is one level up from src/
+    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, relative_path)
 
 
 def compact_timestamp() -> str:
