@@ -34,6 +34,8 @@ echo "[1/6] Preparing AppDir..."
 rm -rf "$APPDIR"
 mkdir -p "$APPDIR/usr/python"
 mkdir -p "$APPDIR/usr/src"
+mkdir -p "$APPDIR/usr/bin"
+mkdir -p "$APPDIR/usr/lib"
 mkdir -p "$DIST_DIR"
 
 # ---------------------------------------------------------------------------
@@ -107,9 +109,39 @@ for dir in src mimetic blossom_public dancer; do
 done
 
 # ---------------------------------------------------------------------------
-# 4. AppImage metadata (AppRun + desktop entry + icon)
+# 4. Bundle system dependencies (ffmpeg binary + shared libs)
+#    so the user doesn't need to install anything
 # ---------------------------------------------------------------------------
-echo "[4/6] Preparing AppImage metadata..."
+echo "[4/6] Bundling system dependencies..."
+
+# ffmpeg binary
+if command -v ffmpeg &>/dev/null; then
+    cp "$(command -v ffmpeg)" "$APPDIR/usr/bin/ffmpeg"
+    echo "  Bundled ffmpeg"
+else
+    echo "  WARNING: ffmpeg not found — install it before building"
+fi
+
+# Copy required shared libraries
+bundle_lib() {
+    local lib
+    lib=$(ldconfig -p | grep "^[[:space:]]*$1" | awk '{print $NF}' | head -1)
+    if [ -n "$lib" ] && [ -f "$lib" ]; then
+        cp -n "$lib" "$APPDIR/usr/lib/"
+        echo "  Bundled $1"
+    else
+        echo "  WARNING: $1 not found"
+    fi
+}
+
+bundle_lib "libportaudio.so.2"
+bundle_lib "libportaudiocpp.so.0"
+bundle_lib "libxcb-cursor.so.0"
+
+# ---------------------------------------------------------------------------
+# 5. AppImage metadata (AppRun + desktop entry + icon)
+# ---------------------------------------------------------------------------
+echo "[5/7] Preparing AppImage metadata..."
 
 cp "$PROJECT_DIR/AppRun" "$APPDIR/AppRun"
 chmod +x "$APPDIR/AppRun"
@@ -171,7 +203,7 @@ fi
 # ---------------------------------------------------------------------------
 # 5. Download appimagetool if needed
 # ---------------------------------------------------------------------------
-echo "[5/6] Checking appimagetool..."
+echo "[6/7] Checking appimagetool..."
 if [ ! -f "$APPIMAGETOOL" ]; then
     echo "  Downloading appimagetool..."
     wget -q --show-progress \
@@ -183,9 +215,9 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 6. Build the AppImage
+# 7. Build the AppImage
 # ---------------------------------------------------------------------------
-echo "[6/6] Building AppImage..."
+echo "[7/7] Building AppImage..."
 ARCH=x86_64 "$APPIMAGETOOL" --appimage-extract-and-run --comp gzip "$APPDIR" "$DIST_DIR/$APPIMAGE_NAME"
 
 echo ""

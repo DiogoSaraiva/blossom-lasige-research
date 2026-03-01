@@ -42,4 +42,14 @@ EOF
     fi
 fi
 
+# Serial port access: warn if user is not in dialout group
+if ! id -nG "$USER" | grep -qw dialout; then
+    echo ""
+    echo "    WARNING: user '$USER' is not in the 'dialout' group."
+    echo "   The Blossom robot uses a USB serial port (/dev/ttyACM*)."
+    echo "   Run once and then log out/in:"
+    echo "     sudo usermod -a -G dialout \$USER"
+    echo ""
+fi
+
 exec "$PYTHON" "$APPDIR/usr/src/start.py" "$@"
