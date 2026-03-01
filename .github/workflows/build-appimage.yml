@@ -48,5 +48,5 @@ jobs:
         with:
           files: |
             dist/Blossom_LASIGE-x86_64.AppImage
-            blossom.png
+            src/blossom.png
           generate_release_notes: true
