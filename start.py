@@ -7,8 +7,9 @@ import sys
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "blossom.png")
-    if os.path.exists(icon_path):
-        app.setWindowIcon(QIcon(icon_path))
+    icon = QIcon(icon_path) if os.path.exists(icon_path) else QIcon()
+    app.setWindowIcon(icon)
     window = MainWindow()
+    window.setWindowIcon(icon)
     window.show()
     sys.exit(app.exec())
