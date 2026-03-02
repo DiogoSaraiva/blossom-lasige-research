@@ -1,4 +1,4 @@
-name: Build AppImage
+name: Build
 
 on:
   push:
@@ -31,20 +31,26 @@ jobs:
             libportaudiocpp0 \
             libxcb-cursor0 \
             libasound2 \
-            ffmpeg \
-            rsync
+            ffmpeg
 
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
 
-      - name: Build AppImage
-        run: bash build_appimage.sh
+      - name: Build
+        run: pyinstaller blossom.spec
+
+      - name: Package
+        run: |
+          cd dist
+          zip -r Blossom_LASIGE_Research-x86_64.zip Blossom_LASIGE_Research/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Blossom_LASIGE-x86_64.AppImage
-          path: dist/Blossom_LASIGE-x86_64.AppImage
+          name: Blossom_LASIGE_Research-x86_64
+          path: dist/Blossom_LASIGE_Research-x86_64.zip
           retention-days: 7
 
       - name: Create GitHub Release
@@ -52,6 +58,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/Blossom_LASIGE-x86_64.AppImage
+            dist/Blossom_LASIGE_Research-x86_64.zip
             src/blossom.png
           generate_release_notes: true

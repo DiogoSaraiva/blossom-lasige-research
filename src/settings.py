@@ -31,6 +31,7 @@ class Settings:
     send_threshold: float = 2.0
     target_fps: int = 30
     cam_device: str = "/dev/video0"
+    mediapipe_delegate: str = "auto"
 
     # Dancer
     dancer_mode: str = "mic"
@@ -75,6 +76,7 @@ class SettingManager:
         settings.target_fps = int(self.qs.value("target_fps", settings.target_fps))
 
         settings.cam_device = self.qs.value("cam_device", settings.cam_device)
+        settings.mediapipe_delegate = self.qs.value("mediapipe_delegate", settings.mediapipe_delegate)
 
         # Dancer
         settings.music_directory = self.qs.value("music_directory", settings.music_directory)
@@ -108,6 +110,7 @@ class SettingManager:
         self.qs.setValue("send_rate", settings.send_rate)
         self.qs.setValue("target_fps", settings.target_fps)
         self.qs.setValue("cam_device", settings.cam_device)
+        self.qs.setValue("mediapipe_delegate", settings.mediapipe_delegate)
 
         # Dancer
         self.qs.setValue("dancer_mode", settings.dancer_mode)

@@ -1631,6 +1631,44 @@
       </property>
      </widget>
     </widget>
+    <widget class="QGroupBox" name="mediapipe_delegate_group">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>330</y>
+       <width>461</width>
+       <height>60</height>
+      </rect>
+     </property>
+     <property name="title">
+      <string>MediaPipe Delegate</string>
+     </property>
+     <widget class="QComboBox" name="mediapipe_delegate">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>25</y>
+        <width>441</width>
+        <height>27</height>
+       </rect>
+      </property>
+      <item>
+       <property name="text">
+        <string>auto</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>gpu</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>cpu</string>
+       </property>
+      </item>
+     </widget>
+    </widget>
    </widget>
    <widget class="QWidget" name="dancer_tab">
     <attribute name="title">

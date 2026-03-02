@@ -19,7 +19,8 @@ class Mimetic:
                  capture_thread: FrameCaptureThread, logger: dict[str, Logger | None], alpha_map: dict[str, float],
                  multiplier_map: dict[str, float], limit_map: dict[str, dict[str, float]],
                  send_rate: int, send_threshold: float,
-                 left_threshold: float = 0.45, right_threshold: float = 0.55, flip_blossoms: bool = False,):
+                 left_threshold: float = 0.45, right_threshold: float = 0.55, flip_blossoms: bool = False,
+                 mediapipe_delegate: str = "auto"):
         """
                 Initialize the Mimetic class.
 
@@ -64,6 +65,7 @@ class Mimetic:
 
         self.left_threshold = left_threshold
         self.right_threshold = right_threshold
+        self.mediapipe_delegate = mediapipe_delegate
 
 
     def update_sender(self, number: Literal["one", "two"], blossom_sender: BlossomSenderThread | None):
@@ -196,7 +198,8 @@ class Mimetic:
         self.left_threshold, self.right_threshold = left_threshold, right_threshold
         if self.is_running:
             self.mp_thread = MediaPipeThread(result_buffer=self.pose_buffer, logger=self.logger,
-                                         left_threshold=self.left_threshold, right_threshold=self.right_threshold, mirror_video=self.mirror_video)
+                                         left_threshold=self.left_threshold, right_threshold=self.right_threshold,
+                                         mirror_video=self.mirror_video, delegate=self.mediapipe_delegate)
 
     def update_output_directory(self, directory):
         """Update output directory and recreate pose logger with new path."""
@@ -243,7 +246,8 @@ class Mimetic:
         frame_height, frame_width = frame_display.shape[:2]
         self.logger(f"[INFO] Detected camera with resolution: {frame_width}x{frame_height}")
         self.mp_thread = MediaPipeThread(result_buffer=self.pose_buffer, logger=self.logger,
-                                         left_threshold=self.left_threshold, right_threshold=self.right_threshold, mirror_video=self.mirror_video)
+                                         left_threshold=self.left_threshold, right_threshold=self.right_threshold,
+                                         mirror_video=self.mirror_video, delegate=self.mediapipe_delegate)
         self.mp_thread.start()
         return frame_width, frame_height
 

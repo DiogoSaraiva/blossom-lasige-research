@@ -1,4 +1,4 @@
-# Form implementation generated from reading ui file 'settings_dialog.ui'
+# Form implementation generated from reading ui file 'src/settings_dialog.ui'
 #
 # Created by: PyQt6 UI code generator 6.9.1
 #
@@ -473,6 +473,15 @@ class Ui_SettingsDialog(object):
         self.cam_device = QtWidgets.QComboBox(parent=self.cam_device_group)
         self.cam_device.setGeometry(QtCore.QRect(10, 40, 441, 27))
         self.cam_device.setObjectName("cam_device")
+        self.mediapipe_delegate_group = QtWidgets.QGroupBox(parent=self.mimetic_tab)
+        self.mediapipe_delegate_group.setGeometry(QtCore.QRect(10, 330, 461, 60))
+        self.mediapipe_delegate_group.setObjectName("mediapipe_delegate_group")
+        self.mediapipe_delegate = QtWidgets.QComboBox(parent=self.mediapipe_delegate_group)
+        self.mediapipe_delegate.setGeometry(QtCore.QRect(10, 25, 441, 27))
+        self.mediapipe_delegate.setObjectName("mediapipe_delegate")
+        self.mediapipe_delegate.addItem("")
+        self.mediapipe_delegate.addItem("")
+        self.mediapipe_delegate.addItem("")
         self.tabs.addTab(self.mimetic_tab, "")
         self.dancer_tab = QtWidgets.QWidget()
         self.dancer_tab.setObjectName("dancer_tab")
@@ -583,6 +592,10 @@ class Ui_SettingsDialog(object):
         self.min.setText(_translate("SettingsDialog", "Min"))
         self.max.setText(_translate("SettingsDialog", "Max"))
         self.cam_device_group.setTitle(_translate("SettingsDialog", "Camera Device"))
+        self.mediapipe_delegate_group.setTitle(_translate("SettingsDialog", "MediaPipe Delegate"))
+        self.mediapipe_delegate.setItemText(0, _translate("SettingsDialog", "auto"))
+        self.mediapipe_delegate.setItemText(1, _translate("SettingsDialog", "gpu"))
+        self.mediapipe_delegate.setItemText(2, _translate("SettingsDialog", "cpu"))
         self.tabs.setTabText(self.tabs.indexOf(self.mimetic_tab), _translate("SettingsDialog", "Mimetic"))
         self.music_directory_group.setTitle(_translate("SettingsDialog", "Music Directory"))
         self.browse_music_dir_button.setText(_translate("SettingsDialog", "Browse"))

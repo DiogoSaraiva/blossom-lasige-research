@@ -65,14 +65,13 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         self.multiplier_map_e_value.setValue(current.multiplier_map['e'])
         self.send_rate.setValue(current.send_rate)
         self.send_threshold.setValue(current.send_threshold)
+        self.mediapipe_delegate.setCurrentText(current.mediapipe_delegate)
 
         # Dancer
         self.dancer_mode.setCurrentText(current.dancer_mode)
         self.music_directory.setText(current.music_directory)
         self.mic_sr.setValue(current.mic_sr)
         self.browse_music_dir_button.clicked.connect(self._browse_music_dir)
-
-
 
         self.buttonBox.accepted.connect(self._on_accept)
         self.buttonBox.rejected.connect(self.reject)
@@ -86,11 +85,11 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
                                                                                       "blossom_two_device") else "",
             current_cam=self._current_combo_value(self.cam_device) if hasattr(self, "cam_device") else "",
         )
+
     def _browse_music_dir(self):
         path = QFileDialog.getExistingDirectory(self, "Choose Music Directory", self.music_directory.text())
         if path:
             self.music_directory.setText(path)
-
 
     def _browse_output_dir(self):
         path = QFileDialog.getExistingDirectory(self, "Choose Output Directory", self.output_directory.text())
@@ -124,6 +123,7 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
                 send_threshold=float(self.send_threshold.text()),
                 target_fps=int(self.target_fps.text()),
                 cam_device=self.cam_device.currentText(),
+                mediapipe_delegate=self.mediapipe_delegate.currentText(),
                 # Dancer
                 music_directory=self.music_directory.text().strip(),
                 dancer_mode=self.dancer_mode.currentText(),

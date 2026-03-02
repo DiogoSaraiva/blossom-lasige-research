@@ -50,7 +50,7 @@ class MediaPipeThread(threading.Thread):
         max_queue (int, optional): Maximum number of frames in the processing queue.
         logger (Logger, optional): Logger instance for logging messages.
     """
-    def __init__(self, result_buffer: PoseBuffer, logger: Logger, mirror_video: bool, model_dir: str = None, max_queue=8, left_threshold: float = 0.45, right_threshold: float = 0.55):
+    def __init__(self, result_buffer: PoseBuffer, logger: Logger, mirror_video: bool, model_dir: str = None, max_queue=8, left_threshold: float = 0.45, right_threshold: float = 0.55, delegate: str = "auto"):
         """
         Initialize the MediaPipeThread.
 
@@ -87,7 +87,7 @@ class MediaPipeThread(threading.Thread):
             raise FileNotFoundError(f"MediaPipe models not found in {model_dir}")
 
         try:
-            self._init_landmarkers(face_model, pose_model)
+            self._init_landmarkers(face_model, pose_model, delegate=delegate)
         except Exception as e:
             self.logger(f"[MediaPipe] Error initializing MediaPipe models: {e}", level="critical")
             raise RuntimeError("Failed to initialize MediaPipe models") from e
@@ -96,27 +96,35 @@ class MediaPipeThread(threading.Thread):
         self.gaze_estimator = GazeEstimator(left_threshold=left_threshold, right_threshold=right_threshold, mirror=self.gaze_estimator.mirror)
 
 
-    def _init_landmarkers(self, face_model, pose_model):
-        for delegate in [BaseOptions.Delegate.GPU, BaseOptions.Delegate.CPU]:
+    def _init_landmarkers(self, face_model, pose_model, delegate: str = "auto"):
+        delegate_lower = delegate.lower()
+        if delegate_lower == "gpu":
+            candidates = [BaseOptions.Delegate.GPU]
+        elif delegate_lower == "cpu":
+            candidates = [BaseOptions.Delegate.CPU]
+        else:  # "auto"
+            candidates = [BaseOptions.Delegate.GPU, BaseOptions.Delegate.CPU]
+
+        for d in candidates:
             try:
                 face_options = FaceLandmarkerOptions(
-                    base_options=BaseOptions(model_asset_path=face_model, delegate=delegate),
+                    base_options=BaseOptions(model_asset_path=face_model, delegate=d),
                     running_mode=vision.RunningMode.LIVE_STREAM,
                     result_callback=self.face_callback,
                     output_facial_transformation_matrixes=True
                 )
                 self.face_landmarker = vision.FaceLandmarker.create_from_options(face_options)
                 pose_options = PoseLandmarkerOptions(
-                    base_options=BaseOptions(model_asset_path=pose_model, delegate=delegate),
+                    base_options=BaseOptions(model_asset_path=pose_model, delegate=d),
                     running_mode=vision.RunningMode.LIVE_STREAM,
                     result_callback=self.pose_callback
                 )
                 self.pose_landmarker = vision.PoseLandmarker.create_from_options(pose_options)
-                label = "GPU" if delegate == BaseOptions.Delegate.GPU else "CPU"
+                label = "GPU" if d == BaseOptions.Delegate.GPU else "CPU"
                 self.logger(f"[MediaPipe] Using {label} delegate.", level="info")
                 return
             except Exception as e:
-                if delegate == BaseOptions.Delegate.GPU:
+                if d == BaseOptions.Delegate.GPU and delegate_lower == "auto":
                     self.logger(f"[MediaPipe] GPU initialization failed: {e}. Retrying with CPU...", level="warning")
                 else:
                     raise
