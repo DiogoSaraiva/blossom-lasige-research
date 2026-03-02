@@ -4,9 +4,12 @@
 set -e
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
+VERSION=$(git -C "$PROJECT_DIR" describe --tags --abbrev=0 2>/dev/null || echo "dev")
+OUTPUT="Blossom_LASIGE_Research-${VERSION}-x86_64"
 
 echo "======================================="
 echo " Blossom LASIGE Research — PyInstaller"
+echo " Version : $VERSION"
 echo "======================================="
 
 # Install PyInstaller if not present
@@ -22,9 +25,11 @@ echo "[2/2] Building..."
 cd "$PROJECT_DIR"
 pyinstaller blossom.spec
 
+# Rename output to include version
+mv "$PROJECT_DIR/dist/Blossom_LASIGE_Research" "$PROJECT_DIR/dist/$OUTPUT"
+
 echo ""
 echo "======================================="
 echo " Done!"
-echo " Output: dist/Blossom_LASIGE_Research/"
-echo " To install: bash install.sh"
+echo " Output: dist/$OUTPUT"
 echo "======================================="

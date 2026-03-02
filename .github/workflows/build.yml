@@ -39,13 +39,18 @@ jobs:
           pip install pyinstaller
 
       - name: Build
-        run: pyinstaller blossom.spec
+        run: |
+          VERSION=${GITHUB_REF_NAME:-dev}
+          pyinstaller blossom.spec
+          mv dist/Blossom_LASIGE_Research "dist/Blossom_LASIGE_Research-${VERSION}-x86_64"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        run: echo "OUTPUT=$(ls dist/Blossom_LASIGE_Research-*-x86_64)" >> $GITHUB_ENV
+
+      - uses: actions/upload-artifact@v4
         with:
           name: Blossom_LASIGE_Research-x86_64
-          path: dist/Blossom_LASIGE_Research
+          path: ${{ env.OUTPUT }}
           retention-days: 7
 
       - name: Create GitHub Release
@@ -53,6 +58,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/Blossom_LASIGE_Research
+            ${{ env.OUTPUT }}
             src/blossom.png
           generate_release_notes: true
