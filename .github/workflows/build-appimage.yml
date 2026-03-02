@@ -41,16 +41,11 @@ jobs:
       - name: Build
         run: pyinstaller blossom.spec
 
-      - name: Package
-        run: |
-          cd dist
-          zip -r Blossom_LASIGE_Research-x86_64.zip Blossom_LASIGE_Research/
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: Blossom_LASIGE_Research-x86_64
-          path: dist/Blossom_LASIGE_Research-x86_64.zip
+          path: dist/Blossom_LASIGE_Research
           retention-days: 7
 
       - name: Create GitHub Release
@@ -58,6 +53,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/Blossom_LASIGE_Research-x86_64.zip
+            dist/Blossom_LASIGE_Research
             src/blossom.png
           generate_release_notes: true

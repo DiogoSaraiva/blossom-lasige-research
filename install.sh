@@ -8,7 +8,7 @@ BIN_LINK="/usr/local/bin/blossom-lasige-research"
 DESKTOP_FILE="$HOME/.local/share/applications/blossom-lasige-research.desktop"
 ICON_FILE="$HOME/.local/share/icons/blossom-lasige-research.png"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DIST_DIR="$SCRIPT_DIR/dist/Blossom_LASIGE_Research"
+DIST_BIN="$SCRIPT_DIR/dist/Blossom_LASIGE_Research"
 
 # ── Uninstall ──────────────────────────────────────────────────────────────
 if [[ "${1:-}" == "--uninstall" ]]; then
@@ -21,8 +21,8 @@ if [[ "${1:-}" == "--uninstall" ]]; then
 fi
 
 # ── Checks ─────────────────────────────────────────────────────────────────
-if [ ! -d "$DIST_DIR" ]; then
-    echo "ERROR: Build not found at $DIST_DIR"
+if [ ! -f "$DIST_BIN" ]; then
+    echo "ERROR: Build not found at $DIST_BIN"
     echo "Run 'bash build.sh' first."
     exit 1
 fi
@@ -31,7 +31,8 @@ fi
 echo "Installing Blossom LASIGE Research to $INSTALL_DIR ..."
 
 sudo mkdir -p "$INSTALL_DIR"
-sudo cp -r "$DIST_DIR/." "$INSTALL_DIR/"
+sudo cp "$DIST_BIN" "$INSTALL_DIR/Blossom_LASIGE_Research"
+sudo cp "$SCRIPT_DIR/install.sh" "$INSTALL_DIR/install.sh"
 sudo chmod +x "$INSTALL_DIR/Blossom_LASIGE_Research"
 
 # Symlink into PATH
@@ -40,8 +41,8 @@ echo "  → symlink: $BIN_LINK"
 
 # Icon
 mkdir -p "$(dirname "$ICON_FILE")"
-if [ -f "$DIST_DIR/_internal/src/blossom.png" ]; then
-    cp "$DIST_DIR/_internal/src/blossom.png" "$ICON_FILE"
+if [ -f "$SCRIPT_DIR/src/blossom.png" ]; then
+    cp "$SCRIPT_DIR/src/blossom.png" "$ICON_FILE"
 fi
 
 # Desktop entry (application menu)
